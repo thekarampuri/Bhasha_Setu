@@ -8,29 +8,31 @@ model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
 def transcribe_and_translate(file_path: str):
     try:
+        print(f"Processing audio: {file_path}")
         segments, info = model.transcribe(file_path, beam_size=5)
         source_text = "".join([segment.text for segment in segments]).strip()
         
+        print(f"Detected language: {info.language} with probability {info.language_probability}")
+        print(f"Source text: {source_text}")
+
         if not source_text:
             return {
                 "success": True,
-                "source_text": "",
+                "source_text": "No speech detected",
                 "translated_text": "",
                 "source_language": info.language,
-                "target_language": "en" if info.language == "mr" else "mr"
+                "target_language": "en"
             }
 
         # Determine translation direction
-        # Whisper language detection codes are usually 2-letter
         source_lang = info.language
-        
-        # We only support mr <-> en for now
         if source_lang not in ["mr", "en"]:
-            # Fallback or attempt to translate from English if detection failed
             source_lang = "en" 
 
         translated_text = translate_text(source_text, source_lang)
         target_lang = "en" if source_lang == "mr" else "mr"
+        
+        print(f"Translated text: {translated_text}")
 
         return {
             "success": True,

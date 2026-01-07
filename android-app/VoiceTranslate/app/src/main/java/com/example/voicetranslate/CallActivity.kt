@@ -3,6 +3,7 @@ package com.example.voicetranslate
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -93,8 +94,11 @@ class CallActivity : AppCompatActivity() {
             .post(requestBody)
             .build()
 
+        Log.d("VoiceTranslate", "Sending request to: $backendUrl/stt")
+
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                Log.e("VoiceTranslate", "Upload failed", e)
                 runOnUiThread {
                     binding.tvCallStatus.text = "Status: Error - ${e.message}"
                 }
@@ -102,20 +106,32 @@ class CallActivity : AppCompatActivity() {
 
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string()
+                Log.d("VoiceTranslate", "Response Body: $body")
+                
                 if (response.isSuccessful && body != null) {
-                    val result = gson.fromJson(body, TranslateResponse::class.java)
-                    runOnUiThread {
-                        if (result.success) {
-                            binding.tvCallStatus.text = "Status: Done"
-                            binding.tvYouPlaceholder.text = result.source_text
-                            binding.tvTranslatedPlaceholder.text = result.translated_text
-                        } else {
-                            binding.tvCallStatus.text = "Status: Processing Failed"
+                    try {
+                        val result = gson.fromJson(body, TranslateResponse::class.java)
+                        runOnUiThread {
+                            if (result.success) {
+                                binding.tvCallStatus.text = "Status: Done"
+                                binding.tvYouPlaceholder.text = if (result.source_text.isEmpty()) "No speech" else result.source_text
+                                binding.tvTranslatedPlaceholder.text = if (result.translated_text.isEmpty()) "-" else result.translated_text
+                                Log.d("VoiceTranslate", "UI Updated with: ${result.source_text}")
+                            } else {
+                                binding.tvCallStatus.text = "Status: Processing Failed"
+                                Log.e("VoiceTranslate", "Backend reported success=false")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("VoiceTranslate", "JSON Parsing error", e)
+                        runOnUiThread {
+                            binding.tvCallStatus.text = "Status: Parsing Error"
                         }
                     }
                 } else {
+                    Log.e("VoiceTranslate", "Server returned error code: ${response.code}")
                     runOnUiThread {
-                        binding.tvCallStatus.text = "Status: Server Error"
+                        binding.tvCallStatus.text = "Status: Server Error (${response.code})"
                     }
                 }
             }
