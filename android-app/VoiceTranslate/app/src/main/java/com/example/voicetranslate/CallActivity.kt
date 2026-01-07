@@ -3,8 +3,6 @@ package com.example.voicetranslate
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
-import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -79,7 +77,7 @@ class CallActivity : AppCompatActivity() {
         wavRecorder?.stopRecording()
         isRecording = false
         binding.btnPushToTalk.text = "🎙 Hold to Speak"
-        binding.tvCallStatus.text = "Status: Processing STT..."
+        binding.tvCallStatus.text = "Status: Transcribing & Translating..."
         
         uploadAudio(File(cacheDir, "recording.wav"))
     }
@@ -99,17 +97,21 @@ class CallActivity : AppCompatActivity() {
             override fun onFailure(call: Call, e: IOException) {
                 runOnUiThread {
                     binding.tvCallStatus.text = "Status: Error - ${e.message}"
-                    Toast.makeText(this@CallActivity, "Network Error", Toast.LENGTH_SHORT).show()
                 }
             }
 
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string()
                 if (response.isSuccessful && body != null) {
-                    val sttResponse = gson.fromJson(body, SttResponse::class.java)
+                    val result = gson.fromJson(body, TranslateResponse::class.java)
                     runOnUiThread {
-                        binding.tvCallStatus.text = "Status: Idle"
-                        binding.tvYouPlaceholder.text = sttResponse.text
+                        if (result.success) {
+                            binding.tvCallStatus.text = "Status: Done"
+                            binding.tvYouPlaceholder.text = result.source_text
+                            binding.tvTranslatedPlaceholder.text = result.translated_text
+                        } else {
+                            binding.tvCallStatus.text = "Status: Processing Failed"
+                        }
                     }
                 } else {
                     runOnUiThread {
@@ -120,5 +122,11 @@ class CallActivity : AppCompatActivity() {
         })
     }
 
-    data class SttResponse(val success: Boolean, val text: String, val language: String?)
+    data class TranslateResponse(
+        val success: Boolean,
+        val source_text: String,
+        val translated_text: String,
+        val source_language: String?,
+        val target_language: String?
+    )
 }

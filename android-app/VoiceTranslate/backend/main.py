@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 import shutil
 import os
-from stt import transcribe_audio
+from stt import transcribe_and_translate
 
 app = FastAPI()
 
@@ -17,8 +17,8 @@ async def speech_to_text(file: UploadFile = File(...)):
     with open(temp_file, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Transcribe using Whisper
-    result = transcribe_audio(temp_file)
+    # Transcribe and translate
+    result = transcribe_and_translate(temp_file)
     
     # Clean up
     os.remove(temp_file)
