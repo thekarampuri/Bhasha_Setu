@@ -2,4 +2,6 @@ fastapi
 uvicorn
 python-multipart
 faster-whisper
-argostranslate
+torch
+transformers
+sentencepiece
