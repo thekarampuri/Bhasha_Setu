@@ -50,23 +50,24 @@ class CallActivity : AppCompatActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
-        // More robustly get intent extras
         backendUrl = intent.getStringExtra("BACKEND_URL") ?: run {
-            Log.e("CallActivity", "BACKEND_URL extra missing!")
-            Toast.makeText(this, "Error: Backend URL not provided", Toast.LENGTH_LONG).show()
-            finish()
+            handleIntentError("BACKEND_URL extra missing!")
             return
         }
         languageCode = intent.getStringExtra("LANGUAGE_CODE") ?: run {
-            Log.e("CallActivity", "LANGUAGE_CODE extra missing!")
-            Toast.makeText(this, "Error: Language not selected", Toast.LENGTH_LONG).show()
-            finish()
+            handleIntentError("LANGUAGE_CODE extra missing!")
             return
         }
         
         Log.d("CallActivity", "Loaded with URL: $backendUrl and Language: $languageCode")
         
         setupUI()
+    }
+
+    private fun handleIntentError(message: String) {
+        Log.e("CallActivity", message)
+        Toast.makeText(this, "Error: Essential data not provided.", Toast.LENGTH_LONG).show()
+        finish()
     }
 
     private fun setupUI() {
@@ -106,7 +107,7 @@ class CallActivity : AppCompatActivity() {
     }
 
     private fun updateButtonStates() {
-        // Visual feedback logic remains the same
+        // Visual feedback logic
     }
 
     private fun checkPermissionAndStart() {
@@ -136,7 +137,7 @@ class CallActivity : AppCompatActivity() {
     }
 
     private fun uploadAudio(file: File) {
-        Log.d("CallActivity", "Uploading audio with language code: $languageCode")
+        Log.d("CallActivity", "Uploading audio with language code: '$languageCode'")
 
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -151,7 +152,7 @@ class CallActivity : AppCompatActivity() {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                runOnUiThread { binding.tvCallStatus.text = "Status: Error - ${e.message}" }
+                runOnUiThread { binding.tvCallStatus.text = "Status: Network Error - ${e.message}" }
             }
 
             override fun onResponse(call: Call, response: Response) {
