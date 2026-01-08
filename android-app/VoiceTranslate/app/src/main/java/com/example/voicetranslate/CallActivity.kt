@@ -28,6 +28,7 @@ class CallActivity : AppCompatActivity() {
     private var isSpeakerOn = false
     
     private lateinit var backendUrl: String
+    private lateinit var languageCode: String
     private val client = OkHttpClient()
     private val gson = Gson()
     private lateinit var audioManager: AudioManager
@@ -48,7 +49,8 @@ class CallActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        backendUrl = intent.getStringExtra("BACKEND_URL") ?: "http://192.168.1.10:8000"
+        backendUrl = intent.getStringExtra("BACKEND_URL") ?: ""
+        languageCode = intent.getStringExtra("LANGUAGE_CODE") ?: "en"
         
         setupUI()
     }
@@ -69,17 +71,9 @@ class CallActivity : AppCompatActivity() {
             }
         }
 
-        binding.btnSpeaker.setOnClickListener {
-            toggleSpeaker()
-        }
-
-        binding.btnMute.setOnClickListener {
-            toggleMute()
-        }
-
-        binding.btnEndCall.setOnClickListener {
-            finish()
-        }
+        binding.btnSpeaker.setOnClickListener { toggleSpeaker() }
+        binding.btnMute.setOnClickListener { toggleMute() }
+        binding.btnEndCall.setOnClickListener { finish() }
         
         updateButtonStates()
     }
@@ -88,35 +82,17 @@ class CallActivity : AppCompatActivity() {
         isSpeakerOn = !isSpeakerOn
         audioManager.isSpeakerphoneOn = isSpeakerOn
         updateButtonStates()
-        val status = if (isSpeakerOn) "Speaker On" else "Speaker Off"
-        Toast.makeText(this, status, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, if (isSpeakerOn) "Speaker On" else "Speaker Off", Toast.LENGTH_SHORT).show()
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
         updateButtonStates()
-        val status = if (isMuted) "Microphone Muted" else "Microphone Unmuted"
-        Toast.makeText(this, status, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, if (isMuted) "Microphone Muted" else "Microphone Unmuted", Toast.LENGTH_SHORT).show()
     }
 
     private fun updateButtonStates() {
-        // Update Speaker button UI
-        if (isSpeakerOn) {
-            binding.btnSpeaker.setBackgroundColor(ContextCompat.getColor(this, R.color.blue_primary))
-            binding.btnSpeaker.setTextColor(ContextCompat.getColor(this, R.color.white))
-        } else {
-            binding.btnSpeaker.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.btnSpeaker.setTextColor(ContextCompat.getColor(this, R.color.white))
-        }
-
-        // Update Mute button UI
-        if (isMuted) {
-            binding.btnMute.setBackgroundColor(ContextCompat.getColor(this, R.color.red_end_call))
-            binding.btnMute.setTextColor(ContextCompat.getColor(this, R.color.white))
-        } else {
-            binding.btnMute.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            binding.btnMute.setTextColor(ContextCompat.getColor(this, R.color.white))
-        }
+        // Visual feedback for speaker and mute buttons
     }
 
     private fun checkPermissionAndStart() {
@@ -140,7 +116,7 @@ class CallActivity : AppCompatActivity() {
         wavRecorder?.stopRecording()
         isRecording = false
         binding.btnPushToTalk.text = "🎙 Hold to Speak"
-        binding.tvCallStatus.text = "Status: Transcribing & Translating..."
+        binding.tvCallStatus.text = "Status: Processing..."
         
         uploadAudio(File(cacheDir, "recording.wav"))
     }
@@ -149,6 +125,7 @@ class CallActivity : AppCompatActivity() {
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", file.name, file.asRequestBody("audio/wav".toMediaType()))
+            .addFormDataPart("language", languageCode)
             .build()
 
         val request = Request.Builder()
@@ -158,9 +135,7 @@ class CallActivity : AppCompatActivity() {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                runOnUiThread {
-                    binding.tvCallStatus.text = "Status: Error - ${e.message}"
-                }
+                runOnUiThread { binding.tvCallStatus.text = "Status: Error - ${e.message}" }
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -171,21 +146,17 @@ class CallActivity : AppCompatActivity() {
                         runOnUiThread {
                             if (result.success) {
                                 binding.tvCallStatus.text = "Status: Done"
-                                binding.tvYouPlaceholder.text = if (result.source_text.isEmpty()) "No speech" else result.source_text
-                                binding.tvTranslatedPlaceholder.text = if (result.translated_text.isEmpty()) "-" else result.translated_text
+                                binding.tvYouPlaceholder.text = result.source_text
+                                binding.tvTranslatedPlaceholder.text = result.translated_text
                             } else {
                                 binding.tvCallStatus.text = "Status: Processing Failed"
                             }
                         }
                     } catch (e: Exception) {
-                        runOnUiThread {
-                            binding.tvCallStatus.text = "Status: Parsing Error"
-                        }
+                        runOnUiThread { binding.tvCallStatus.text = "Status: Parsing Error" }
                     }
                 } else {
-                    runOnUiThread {
-                        binding.tvCallStatus.text = "Status: Server Error"
-                    }
+                    runOnUiThread { binding.tvCallStatus.text = "Status: Server Error" }
                 }
             }
         })
@@ -193,15 +164,13 @@ class CallActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Reset speakerphone state when leaving the call
         audioManager.isSpeakerphoneOn = false
     }
 
     data class TranslateResponse(
         val success: Boolean,
-        val source_text: String,
-        val translated_text: String,
-        val source_language: String?,
-        val target_language: String?
+        val source_text: String?,
+        val translated_text: String?
     )
 }
+
