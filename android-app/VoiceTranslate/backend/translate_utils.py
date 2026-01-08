@@ -1,60 +1,61 @@
 import os
+# IMPORTANT: This must be set BEFORE importing transformers
 os.environ['TRANSFORMERS_NO_TF'] = '1'
+
 from transformers import MarianMTModel, MarianTokenizer
 import torch
 
-# Load models and tokenizers for Marathi-English translation
-# Note: MarianMT models are loaded on demand and cached locally.
-models = {}
-tokenizers = {}
+# --- Model Cache ---
+model_cache = {}
 
 def get_model_and_tokenizer(from_lang, to_lang):
     pair = f"{from_lang}-{to_lang}"
-    if pair not in models:
+    if pair not in model_cache:
         model_name = f"Helsinki-NLP/opus-mt-{from_lang}-{to_lang}"
-        print(f"Loading translation model: {model_name}...")
+        print(f"Loading translation model for the first time: {model_name}...")
         try:
-            tokenizers[pair] = MarianTokenizer.from_pretrained(model_name)
-            models[pair] = MarianMTModel.from_pretrained(model_name)
-            print(f"✅ Model {model_name} loaded.")
+            tokenizer = MarianTokenizer.from_pretrained(model_name)
+            model = MarianMTModel.from_pretrained(model_name)
+            model_cache[pair] = (model, tokenizer)
+            print(f"✅ Model {model_name} loaded and cached.")
         except Exception as e:
-            print(f"❌ Error loading model {model_name}: {e}")
-            return None, None
-    return models[pair], tokenizers[pair]
+            print(f"❌ FATAL: Could not load model {model_name}. Error: {e}")
+            model_cache[pair] = (None, None)
+    
+    return model_cache[pair]
 
 def translate_text(text, from_lang):
-    if not text or text.strip() == "":
+    if not text or not text.strip():
         return ""
 
-    # Normalize language codes
-    if from_lang == "mar": from_lang = "mr"
-    if from_lang == "eng": from_lang = "en"
-    
-    # Supported pairs: mr-en, en-mr
-    if from_lang == "mr":
-        to_lang = "en"
-    else:
+    if from_lang not in ["mr", "en"]:
         from_lang = "en"
-        to_lang = "mr"
+
+    to_lang = "en" if from_lang == "mr" else "mr"
 
     print(f"[TRANSLATE] {from_lang} -> {to_lang}: {text}")
 
     model, tokenizer = get_model_and_tokenizer(from_lang, to_lang)
     if not model or not tokenizer:
-        return "[Translation Model Load Error]"
+        return "[Translation Model Not Available]"
 
     try:
-        # Tokenize and translate
-        batch = tokenizer([text], return_tensors="pt")
-        generated_ids = model.generate(**batch)
+        batch = tokenizer([text], return_tensors="pt", padding=True)
+        
+        with torch.no_grad():
+            # Use improved generation parameters for better quality
+            generated_ids = model.generate(
+                **batch, 
+                max_length=128, 
+                num_beams=4, 
+                early_stopping=True
+            )
+            print(f"[DEBUG] Generated Token IDs: {generated_ids}")
+
         translated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         
         print(f"[RESULT] {translated_text}")
         return translated_text
     except Exception as e:
-        print(f"❌ Translation Error: {e}")
-        return f"[Translation Error: {str(e)}]"
-
-# Pre-load models to avoid delay during first request (optional but recommended)
-# get_model_and_tokenizer("mr", "en")
-# get_model_and_tokenizer("en", "mr")
+        print(f"❌ Translation Runtime Error: {e}")
+        return "[Translation Failed]"
