@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
-import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -65,7 +65,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         }
 
         // In WebSocket mode, PTT is replaced by continuous streaming
-        binding.btnPushToTalk.visibility = android.view.View.GONE 
+        binding.btnPushToTalk.visibility = View.GONE 
     }
 
     private fun checkPermissionAndStart() {
@@ -84,14 +84,13 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
         audioManager.isSpeakerphoneOn = isSpeakerOn
-        binding.btnSpeaker.setImageResource(
-            if (isSpeakerOn) R.drawable.ic_speaker_on else R.drawable.ic_speaker_off
-        )
+        binding.btnSpeaker.text = if (isSpeakerOn) "Speaker On" else "Speaker Off"
+        Toast.makeText(this, if (isSpeakerOn) "Speaker On" else "Speaker Off", Toast.LENGTH_SHORT).show()
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
-        // CallManager would need a mute implementation if we wanted to stop sending bytes
+        binding.btnMute.text = if (isMuted) "Unmute" else "Mute"
         Toast.makeText(this, if (isMuted) "Muted" else "Unmuted", Toast.LENGTH_SHORT).show()
     }
 

@@ -9,7 +9,7 @@ import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
 
 class CallManager(
-    private val backendUrl: String, // e.g., "192.168.1.10:8000"
+    private val backendUrl: String, // e.g., "192.168.1.10:8000" or "http://192.168.1.10:8000"
     private val callId: String,
     private val sourceLang: String,
     private val targetLang: String,
@@ -40,8 +40,20 @@ class CallManager(
     private var isCalling = false
 
     fun startCall() {
+        // Sanitize the URL: Remove http://, https://, or ws:// if present
+        var sanitizedUrl = backendUrl
+            .replace("http://", "")
+            .replace("https://", "")
+            .replace("ws://", "")
+            .replace("wss://", "")
+        
+        // Remove trailing slashes
+        if (sanitizedUrl.endsWith("/")) {
+            sanitizedUrl = sanitizedUrl.substring(0, sanitizedUrl.length - 1)
+        }
+
         // Construct WebSocket URL: ws://host/ws/call/id/src/target
-        val wsUrl = "ws://$backendUrl/ws/call/$callId/$sourceLang/$targetLang"
+        val wsUrl = "ws://$sanitizedUrl/ws/call/$callId/$sourceLang/$targetLang"
         Log.d("CallManager", "Connecting to $wsUrl")
 
         val request = Request.Builder().url(wsUrl).build()
