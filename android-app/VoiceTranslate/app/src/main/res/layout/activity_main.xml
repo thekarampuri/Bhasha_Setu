@@ -25,12 +25,36 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Multi-Language Voice Calling"
+        android:text="Real-Time Voice Call Translator"
         android:textColor="@color/white"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvAppTitle" />
+
+    <!-- Call ID Input -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCallId"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:hint="Enter Call ID (e.g. 1234)"
+        android:textColorHint="@color/gray_text"
+        app:boxStrokeColor="@color/blue_primary"
+        app:hintTextColor="@color/blue_light"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCallId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:textColor="@color/white" />
+
+    </com.google.android.material.textfield.TextInputLayout>
 
     <!-- Source Language Selection -->
     <com.google.android.material.textfield.TextInputLayout
@@ -38,14 +62,14 @@
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:hint="Language you will speak"
+        android:layout_marginTop="16dp"
+        android:hint="Your Language"
         android:textColorHint="@color/gray_text"
         app:boxStrokeColor="@color/blue_primary"
         app:hintTextColor="@color/blue_light"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
+        app:layout_constraintTop_toBottomOf="@id/tilCallId">
 
         <AutoCompleteTextView
             android:id="@+id/actvSourceLanguage"
@@ -63,7 +87,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="Translate to"
+        android:hint="Their Language"
         android:textColorHint="@color/gray_text"
         app:boxStrokeColor="@color/blue_primary"
         app:hintTextColor="@color/blue_light"
@@ -85,7 +109,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Backend URL"
+        android:text="Backend URL (IP Only)"
         android:textColor="@color/gray_text"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tilTargetLanguage" />
@@ -96,7 +120,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:backgroundTint="@color/blue_primary"
-        android:hint="http://192.168.1.10:8000"
+        android:hint="192.168.1.10:8000"
         android:inputType="textUri"
         android:textColor="@color/white"
         android:textColorHint="@color/gray_text"
@@ -110,7 +134,7 @@
         android:layout_height="60dp"
         android:layout_marginTop="24dp"
         android:backgroundTint="@color/blue_primary"
-        android:text="Start Call"
+        android:text="Join Call"
         android:textAllCaps="false"
         android:textSize="18sp"
         app:cornerRadius="30dp"
@@ -123,7 +147,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
-        android:text="Status: Not Connected"
+        android:text="Both users must use same Call ID"
         android:textColor="@color/gray_text"
         android:textSize="12sp"
         app:layout_constraintBottom_toBottomOf="parent"

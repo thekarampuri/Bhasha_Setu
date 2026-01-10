@@ -40,8 +40,14 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnStartCall.setOnClickListener {
             val url = binding.etBackendUrl.text.toString().trim()
+            val callId = binding.etCallId.text.toString().trim()
+
             if (url.isEmpty()) {
                 binding.etBackendUrl.error = "Enter backend URL"
+                return@setOnClickListener
+            }
+            if (callId.isEmpty()) {
+                binding.etCallId.error = "Enter Call ID"
                 return@setOnClickListener
             }
             if (sourceLanguageCode == null || targetLanguageCode == null) {
@@ -50,10 +56,13 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Save URL for next time
-            getSharedPreferences("app_prefs", MODE_PRIVATE).edit().putString("backend_url", url).apply()
+            getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                .putString("backend_url", url)
+                .apply()
 
             val intent = Intent(this, CallActivity::class.java).apply {
                 putExtra("BACKEND_URL", url)
+                putExtra("CALL_ID", callId)
                 putExtra("SOURCE_LANG", sourceLanguageCode)
                 putExtra("TARGET_LANG", targetLanguageCode)
             }
@@ -79,7 +88,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupBackendUrl() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        val savedUrl = prefs.getString("backend_url", "http://192.168.1.10:8000")
+        val savedUrl = prefs.getString("backend_url", "192.168.1.10:8000")
         binding.etBackendUrl.setText(savedUrl)
     }
 }
