@@ -56,6 +56,8 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         sourceLang = intent.getStringExtra("SOURCE_LANG") ?: "en"
         targetLang = intent.getStringExtra("TARGET_LANG") ?: "en"
         
+        android.util.Log.d("CallActivity", "Received intent extras: URL=$backendUrl, CallID=$callId, Source=$sourceLang, Target=$targetLang")
+        
         setupUI()
         checkPermissionAndStart()
     }

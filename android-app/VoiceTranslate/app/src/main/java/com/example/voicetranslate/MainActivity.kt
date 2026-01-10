@@ -27,8 +27,8 @@ class MainActivity : AppCompatActivity() {
         Language("Telugu", "te")
     )
     
-    private var sourceLanguageCode: String? = null
-    private var targetLanguageCode: String? = null
+    private var sourceLanguageCode: String? = "en"  // Default to English
+    private var targetLanguageCode: String? = "hi"  // Default to Hindi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,8 +50,12 @@ class MainActivity : AppCompatActivity() {
                 binding.etCallId.error = "Enter Call ID"
                 return@setOnClickListener
             }
-            if (sourceLanguageCode == null || targetLanguageCode == null) {
-                Toast.makeText(this, "Please select both languages", Toast.LENGTH_SHORT).show()
+            if (sourceLanguageCode == null || sourceLanguageCode.isNullOrEmpty()) {
+                Toast.makeText(this, "Please select source language", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (targetLanguageCode == null || targetLanguageCode.isNullOrEmpty()) {
+                Toast.makeText(this, "Please select target language", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -59,6 +63,8 @@ class MainActivity : AppCompatActivity() {
             getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
                 .putString("backend_url", url)
                 .apply()
+
+            android.util.Log.d("MainActivity", "Starting call with: URL=$url, CallID=$callId, Source=$sourceLanguageCode, Target=$targetLanguageCode")
 
             val intent = Intent(this, CallActivity::class.java).apply {
                 putExtra("BACKEND_URL", url)
