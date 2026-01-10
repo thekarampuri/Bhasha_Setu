@@ -15,7 +15,7 @@
         android:textColor="@color/blue_light"
         android:textSize="32sp"
         android:textStyle="bold"
-        android:layout_marginTop="64dp"
+        android:layout_marginTop="32dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -32,14 +32,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvAppTitle" />
 
-    <!-- Language Selection Dropdown -->
+    <!-- Source Language Selection -->
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/tilLanguage"
+        android:id="@+id/tilSourceLanguage"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:hint="Select Language You Will Speak"
+        android:hint="Language you will speak"
         android:textColorHint="@color/gray_text"
         app:boxStrokeColor="@color/blue_primary"
         app:hintTextColor="@color/blue_light"
@@ -48,7 +48,31 @@
         app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
 
         <AutoCompleteTextView
-            android:id="@+id/actvLanguage"
+            android:id="@+id/actvSourceLanguage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none"
+            android:textColor="@color/white" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Target Language Selection -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilTargetLanguage"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="Translate to"
+        android:textColorHint="@color/gray_text"
+        app:boxStrokeColor="@color/blue_primary"
+        app:hintTextColor="@color/blue_light"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tilSourceLanguage">
+
+        <AutoCompleteTextView
+            android:id="@+id/actvTargetLanguage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="none"
@@ -64,7 +88,7 @@
         android:text="Backend URL"
         android:textColor="@color/gray_text"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tilLanguage" />
+        app:layout_constraintTop_toBottomOf="@id/tilTargetLanguage" />
 
     <EditText
         android:id="@+id/etBackendUrl"

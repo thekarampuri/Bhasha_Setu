@@ -15,38 +15,27 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val languages = listOf(
-        Language("Assamese", "as"),
-        Language("Bengali", "bn"),
-        Language("Bodo", "brx"),
-        Language("Dogri", "doi"),
         Language("English", "en"),
-        Language("Gujarati", "gu"),
-        Language("Hindi", "hi"),
-        Language("Kannada", "kn"),
-        Language("Konkani", "kok"),
-        Language("Kashmiri", "ks"),
-        Language("Maithili", "mai"),
-        Language("Malayalam", "ml"),
-        Language("Manipuri", "mni"),
         Language("Marathi", "mr"),
-        Language("Nepali", "ne"),
-        Language("Odia", "or"),
+        Language("Hindi", "hi"),
+        Language("Bengali", "bn"),
+        Language("Gujarati", "gu"),
+        Language("Kannada", "kn"),
+        Language("Malayalam", "ml"),
         Language("Punjabi", "pa"),
-        Language("Sanskrit", "sa"),
-        Language("Santali", "sat"),
-        Language("Sindhi", "sd"),
         Language("Tamil", "ta"),
-        Language("Telugu", "te"),
-        Language("Urdu", "ur")
+        Language("Telugu", "te")
     )
-    private var selectedLanguageCode: String? = null
+    
+    private var sourceLanguageCode: String? = null
+    private var targetLanguageCode: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupLanguageDropdown()
+        setupLanguageDropdowns()
         setupBackendUrl()
 
         binding.btnStartCall.setOnClickListener {
@@ -55,8 +44,8 @@ class MainActivity : AppCompatActivity() {
                 binding.etBackendUrl.error = "Enter backend URL"
                 return@setOnClickListener
             }
-            if (selectedLanguageCode == null) {
-                Toast.makeText(this, "Please select a language", Toast.LENGTH_SHORT).show()
+            if (sourceLanguageCode == null || targetLanguageCode == null) {
+                Toast.makeText(this, "Please select both languages", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -65,18 +54,26 @@ class MainActivity : AppCompatActivity() {
 
             val intent = Intent(this, CallActivity::class.java).apply {
                 putExtra("BACKEND_URL", url)
-                putExtra("LANGUAGE_CODE", selectedLanguageCode)
+                putExtra("SOURCE_LANG", sourceLanguageCode)
+                putExtra("TARGET_LANG", targetLanguageCode)
             }
             startActivity(intent)
         }
     }
 
-    private fun setupLanguageDropdown() {
+    private fun setupLanguageDropdowns() {
         val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, languages)
-        binding.actvLanguage.setAdapter(adapter)
-        binding.actvLanguage.setOnItemClickListener { parent, _, position, _ ->
+        
+        binding.actvSourceLanguage.setAdapter(adapter)
+        binding.actvSourceLanguage.setOnItemClickListener { parent, _, position, _ ->
             val selectedLanguage = parent.adapter.getItem(position) as Language
-            selectedLanguageCode = selectedLanguage.code
+            sourceLanguageCode = selectedLanguage.code
+        }
+
+        binding.actvTargetLanguage.setAdapter(adapter)
+        binding.actvTargetLanguage.setOnItemClickListener { parent, _, position, _ ->
+            val selectedLanguage = parent.adapter.getItem(position) as Language
+            targetLanguageCode = selectedLanguage.code
         }
     }
 

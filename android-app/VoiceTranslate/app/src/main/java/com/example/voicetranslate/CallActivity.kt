@@ -28,7 +28,8 @@ class CallActivity : AppCompatActivity() {
     private var isSpeakerOn = false
     
     private lateinit var backendUrl: String
-    private lateinit var languageCode: String
+    private lateinit var sourceLang: String
+    private lateinit var targetLang: String
     private val client = OkHttpClient()
     private val gson = Gson()
     private lateinit var audioManager: AudioManager
@@ -50,24 +51,13 @@ class CallActivity : AppCompatActivity() {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
-        backendUrl = intent.getStringExtra("BACKEND_URL") ?: run {
-            handleIntentError("BACKEND_URL extra missing!")
-            return
-        }
-        languageCode = intent.getStringExtra("LANGUAGE_CODE") ?: run {
-            handleIntentError("LANGUAGE_CODE extra missing!")
-            return
-        }
+        backendUrl = intent.getStringExtra("BACKEND_URL") ?: ""
+        sourceLang = intent.getStringExtra("SOURCE_LANG") ?: "en"
+        targetLang = intent.getStringExtra("TARGET_LANG") ?: "en"
         
-        Log.d("CallActivity", "Loaded with URL: $backendUrl and Language: $languageCode")
+        Log.d("CallActivity", "Loaded with URL: $backendUrl, Source: $sourceLang, Target: $targetLang")
         
         setupUI()
-    }
-
-    private fun handleIntentError(message: String) {
-        Log.e("CallActivity", message)
-        Toast.makeText(this, "Error: Essential data not provided.", Toast.LENGTH_LONG).show()
-        finish()
     }
 
     private fun setupUI() {
@@ -89,25 +79,17 @@ class CallActivity : AppCompatActivity() {
         binding.btnSpeaker.setOnClickListener { toggleSpeaker() }
         binding.btnMute.setOnClickListener { toggleMute() }
         binding.btnEndCall.setOnClickListener { finish() }
-        
-        updateButtonStates()
     }
 
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
         audioManager.isSpeakerphoneOn = isSpeakerOn
-        updateButtonStates()
         Toast.makeText(this, if (isSpeakerOn) "Speaker On" else "Speaker Off", Toast.LENGTH_SHORT).show()
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
-        updateButtonStates()
         Toast.makeText(this, if (isMuted) "Microphone Muted" else "Microphone Unmuted", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun updateButtonStates() {
-        // Visual feedback logic
     }
 
     private fun checkPermissionAndStart() {
@@ -124,7 +106,7 @@ class CallActivity : AppCompatActivity() {
         wavRecorder?.startRecording()
         isRecording = true
         binding.btnPushToTalk.text = "⏹ Stop Recording"
-        binding.tvCallStatus.text = "Status: Recording..."
+        binding.tvCallStatus.text = "Status: Recording ($sourceLang)..."
     }
 
     private fun stopRecordingAndUpload() {
@@ -137,55 +119,43 @@ class CallActivity : AppCompatActivity() {
     }
 
     private fun uploadAudio(file: File) {
-        Log.d("CallActivity", "Uploading audio with language code: '$languageCode'")
-
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", file.name, file.asRequestBody("audio/wav".toMediaType()))
-            .addFormDataPart("language", languageCode)
+            .addFormDataPart("source_lang", sourceLang)
+            .addFormDataPart("target_lang", targetLang)
             .build()
 
         val request = Request.Builder()
-            .url("$backendUrl/stt")
+            .url("$backendUrl/translate")
             .post(requestBody)
             .build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                runOnUiThread { binding.tvCallStatus.text = "Status: Network Error - ${e.message}" }
+                runOnUiThread { binding.tvCallStatus.text = "Status: Network Error" }
             }
 
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string()
-                if (!response.isSuccessful) {
-                    Log.e("CallActivity", "Server Error ${response.code}: $body")
-                    runOnUiThread { binding.tvCallStatus.text = "Status: Server Error (${response.code})" }
-                    return
-                }
-                
                 if (body != null) {
                     try {
                         val result = gson.fromJson(body, TranslateResponse::class.java)
                         runOnUiThread {
                             if (result.success) {
-                                binding.tvCallStatus.text = "Status: Done"
+                                binding.tvCallStatus.text = "Status: Success"
                                 binding.tvYouPlaceholder.text = result.source_text
                                 binding.tvTranslatedPlaceholder.text = result.translated_text
                             } else {
-                                binding.tvCallStatus.text = "Status: Processing Failed"
+                                binding.tvCallStatus.text = "Status: Error"
                             }
                         }
                     } catch (e: Exception) {
-                        runOnUiThread { binding.tvCallStatus.text = "Status: Parsing Error" }
+                        runOnUiThread { binding.tvCallStatus.text = "Status: Parse Error" }
                     }
                 }
             }
         })
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if(this::audioManager.isInitialized) audioManager.isSpeakerphoneOn = false
     }
 
     data class TranslateResponse(
