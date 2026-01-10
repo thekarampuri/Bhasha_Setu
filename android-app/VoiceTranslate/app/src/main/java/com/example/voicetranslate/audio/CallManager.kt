@@ -4,99 +4,73 @@ import android.annotation.SuppressLint
 import android.media.*
 import android.util.Log
 import okhttp3.*
-import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
+import java.util.*
 
 class CallManager(
-    private val backendUrl: String, // e.g., "192.168.1.10:8000" or "http://192.168.1.10:8000"
+    private val backendUrl: String, 
     private val callId: String,
-    private val sourceLang: String,
-    private val targetLang: String,
     private val listener: CallListener
 ) {
     interface CallListener {
         fun onTranscriptionReceived(source: String, translated: String)
-        fun onError(message: String)
         fun onConnected()
+        fun onError(msg: String)
         fun onDisconnected()
     }
 
+    private val userId = UUID.randomUUID().toString().substring(0, 4)
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
-    
     private var webSocket: WebSocket? = null
+
+    // PCM 16bit, 16kHz, Mono = 32,000 bytes per second
+    private val SAMPLE_RATE = 16000
+    private val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
+    private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
+    private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     
-    // Audio Config: 16kHz, Mono, 16-bit PCM
-    private val sampleRate = 16000
-    private val channelIn = AudioFormat.CHANNEL_IN_MONO
-    private val channelOut = AudioFormat.CHANNEL_OUT_MONO
-    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-    private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelIn, audioFormat)
+    // 40ms chunk = (16000 * 0.040) * 2 bytes = 1280 bytes
+    private val CHUNK_SIZE = 1280 
+    private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE)
 
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
-    private var isCalling = false
+    private var isActive = false
 
     fun startCall() {
-        // Sanitize the URL: Remove http://, https://, or ws:// if present
-        var sanitizedUrl = backendUrl
+        // Sanitize the URL
+        val sanitizedUrl = backendUrl
             .replace("http://", "")
             .replace("https://", "")
             .replace("ws://", "")
             .replace("wss://", "")
+            .removeSuffix("/")
+
+        val wsUrl = "ws://$sanitizedUrl/ws/call/$callId/$userId"
+        Log.d("CallManager", "Connecting to relay: $wsUrl")
         
-        // Remove trailing slashes
-        if (sanitizedUrl.endsWith("/")) {
-            sanitizedUrl = sanitizedUrl.substring(0, sanitizedUrl.length - 1)
-        }
-
-        // Construct WebSocket URL: ws://host/ws/call/id/src/target
-        val wsUrl = "ws://$sanitizedUrl/ws/call/$callId/$sourceLang/$targetLang"
-        Log.d("CallManager", "Connecting to $wsUrl")
-
         val request = Request.Builder().url(wsUrl).build()
-        
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                isCalling = true
-                startRecording()
+                isActive = true
+                startCaptureLoop()
                 startPlayback()
                 listener.onConnected()
             }
 
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                // Handle JSON metadata (transcriptions)
-                try {
-                    val json = android.util.JsonReader(text.reader())
-                    var source = ""
-                    var translated = ""
-                    json.beginObject()
-                    while (json.hasNext()) {
-                        when (json.nextName()) {
-                            "source" -> source = json.nextString()
-                            "translated" -> translated = json.nextString()
-                            else -> json.skipValue()
-                        }
-                    }
-                    json.endObject()
-                    listener.onTranscriptionReceived(source, translated)
-                } catch (e: Exception) {
-                    Log.e("CallManager", "JSON Parse Error: ${e.message}")
-                }
-            }
-
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                // Received translated raw PCM from backend
-                playAudio(bytes.toByteArray())
+            override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
+                // Play received raw PCM immediately
+                audioTrack?.write(bytes.toByteArray(), 0, bytes.size)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                listener.onError("Connection Failed: ${t.message}")
+                listener.onError(t.message ?: "Connection failed")
                 stopCall()
             }
-
+            
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 listener.onDisconnected()
                 stopCall()
@@ -105,30 +79,29 @@ class CallManager(
     }
 
     @SuppressLint("MissingPermission")
-    private fun startRecording() {
+    private fun startCaptureLoop() {
         try {
             audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                channelIn,
-                audioFormat,
+                MediaRecorder.AudioSource.MIC, 
+                SAMPLE_RATE, 
+                CHANNEL_IN, 
+                ENCODING, 
                 bufferSize
             )
-            
             audioRecord?.startRecording()
-
+            
             Thread {
-                val audioData = ByteArray(bufferSize)
-                while (isCalling) {
-                    val read = audioRecord?.read(audioData, 0, audioData.size) ?: 0
+                val data = ByteArray(CHUNK_SIZE)
+                while (isActive) {
+                    val read = audioRecord?.read(data, 0, CHUNK_SIZE) ?: 0
                     if (read > 0) {
-                        // Send raw PCM bytes
-                        webSocket?.send(audioData.sliceArray(0 until read).toByteString())
+                        // Send small 40ms packets
+                        webSocket?.send(data.sliceArray(0 until read).toByteString())
                     }
                 }
             }.start()
         } catch (e: Exception) {
-            listener.onError("Recording Error: ${e.message}")
+            listener.onError("Mic Error: ${e.message}")
         }
     }
 
@@ -140,26 +113,21 @@ class CallManager(
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build())
                 .setAudioFormat(AudioFormat.Builder()
-                    .setEncoding(audioFormat)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelOut)
+                    .setEncoding(ENCODING)
+                    .setSampleRate(SAMPLE_RATE)
+                    .setChannelMask(CHANNEL_OUT)
                     .build())
                 .setBufferSizeInBytes(bufferSize)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
-            
             audioTrack?.play()
         } catch (e: Exception) {
-            listener.onError("Playback Error: ${e.message}")
+            listener.onError("Speaker Error: ${e.message}")
         }
     }
 
-    private fun playAudio(data: ByteArray) {
-        audioTrack?.write(data, 0, data.size)
-    }
-
     fun stopCall() {
-        isCalling = false
+        isActive = false
         try {
             audioRecord?.stop()
             audioRecord?.release()
@@ -171,7 +139,7 @@ class CallManager(
         } catch (e: Exception) {
             Log.e("CallManager", "Cleanup Error: ${e.message}")
         }
-        webSocket?.close(1000, "Call Ended")
+        webSocket?.close(1000, "Done")
         webSocket = null
     }
 }

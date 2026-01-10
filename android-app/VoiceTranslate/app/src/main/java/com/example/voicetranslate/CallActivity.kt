@@ -23,8 +23,6 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     
     private lateinit var backendUrl: String
     private lateinit var callId: String
-    private lateinit var sourceLang: String
-    private lateinit var targetLang: String
     private lateinit var audioManager: AudioManager
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -47,15 +45,13 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         
         backendUrl = intent.getStringExtra("BACKEND_URL") ?: ""
         callId = intent.getStringExtra("CALL_ID") ?: ""
-        sourceLang = intent.getStringExtra("SOURCE_LANG") ?: "en"
-        targetLang = intent.getStringExtra("TARGET_LANG") ?: "en"
         
         setupUI()
         checkPermissionAndStart()
     }
 
     private fun setupUI() {
-        binding.tvCallStatus.text = "Connecting to Room: $callId..."
+        binding.tvCallStatus.text = "Connecting to Relay: $callId..."
         
         binding.btnSpeaker.setOnClickListener { toggleSpeaker() }
         binding.btnMute.setOnClickListener { toggleMute() }
@@ -64,7 +60,6 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             finish() 
         }
 
-        // In WebSocket mode, PTT is replaced by continuous streaming
         binding.btnPushToTalk.visibility = View.GONE 
     }
 
@@ -77,7 +72,8 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     }
 
     private fun initiateCall() {
-        callManager = CallManager(backendUrl, callId, sourceLang, targetLang, this)
+        // Simplified constructor for Relay test
+        callManager = CallManager(backendUrl, callId, this)
         callManager?.startCall()
     }
 
@@ -85,22 +81,16 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         isSpeakerOn = !isSpeakerOn
         audioManager.isSpeakerphoneOn = isSpeakerOn
         binding.btnSpeaker.text = if (isSpeakerOn) "Speaker On" else "Speaker Off"
-        Toast.makeText(this, if (isSpeakerOn) "Speaker On" else "Speaker Off", Toast.LENGTH_SHORT).show()
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
         binding.btnMute.text = if (isMuted) "Unmute" else "Mute"
-        Toast.makeText(this, if (isMuted) "Muted" else "Unmuted", Toast.LENGTH_SHORT).show()
     }
 
     // CallManager.CallListener Implementation
     override fun onTranscriptionReceived(source: String, translated: String) {
-        runOnUiThread {
-            binding.tvYouPlaceholder.text = source
-            binding.tvTranslatedPlaceholder.text = translated
-            binding.tvCallStatus.text = "Status: Live"
-        }
+        // Not used in basic relay mode
     }
 
     override fun onError(message: String) {
@@ -112,8 +102,8 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
     override fun onConnected() {
         runOnUiThread {
-            binding.tvCallStatus.text = "Status: Connected"
-            Toast.makeText(this, "Call Started", Toast.LENGTH_SHORT).show()
+            binding.tvCallStatus.text = "Status: Relay Connected"
+            Toast.makeText(this, "Audio Streaming Active", Toast.LENGTH_SHORT).show()
         }
     }
 
