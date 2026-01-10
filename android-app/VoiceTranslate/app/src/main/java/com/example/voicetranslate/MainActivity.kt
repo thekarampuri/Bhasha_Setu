@@ -71,7 +71,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupLanguageDropdowns() {
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, languages)
+        // Use a simple layout for the dropdown items
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, languages)
         
         binding.actvSourceLanguage.setAdapter(adapter)
         binding.actvSourceLanguage.setOnItemClickListener { parent, _, position, _ ->
@@ -84,6 +85,10 @@ class MainActivity : AppCompatActivity() {
             val selectedLanguage = parent.adapter.getItem(position) as Language
             targetLanguageCode = selectedLanguage.code
         }
+        
+        // Ensure the dropdown shows on click even if text is empty
+        binding.actvSourceLanguage.setOnClickListener { binding.actvSourceLanguage.showDropDown() }
+        binding.actvTargetLanguage.setOnClickListener { binding.actvTargetLanguage.showDropDown() }
     }
 
     private fun setupBackendUrl() {
