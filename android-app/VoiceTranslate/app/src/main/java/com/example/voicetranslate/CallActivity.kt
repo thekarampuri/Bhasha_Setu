@@ -23,7 +23,11 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     
     private lateinit var backendUrl: String
     private lateinit var callId: String
+    private lateinit var sourceLang: String
+    private lateinit var targetLang: String
     private lateinit var audioManager: AudioManager
+    
+    private var savedAudioMode: Int = AudioManager.MODE_NORMAL
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -43,8 +47,14 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         
+        // Save current audio mode and configure for voice call
+        savedAudioMode = audioManager.mode
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        
         backendUrl = intent.getStringExtra("BACKEND_URL") ?: ""
         callId = intent.getStringExtra("CALL_ID") ?: ""
+        sourceLang = intent.getStringExtra("SOURCE_LANG") ?: "en"
+        targetLang = intent.getStringExtra("TARGET_LANG") ?: "en"
         
         setupUI()
         checkPermissionAndStart()
@@ -72,8 +82,8 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     }
 
     private fun initiateCall() {
-        // Simplified constructor for Relay test
-        callManager = CallManager(backendUrl, callId, this)
+        // Matches the updated CallManager constructor
+        callManager = CallManager(backendUrl, callId, sourceLang, targetLang, this)
         callManager?.startCall()
     }
 
@@ -85,13 +95,11 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
     private fun toggleMute() {
         isMuted = !isMuted
+        callManager?.setMuted(isMuted)
         binding.btnMute.text = if (isMuted) "Unmute" else "Mute"
     }
 
-    // CallManager.CallListener Implementation
-    override fun onTranscriptionReceived(source: String, translated: String) {
-        // Not used in basic relay mode
-    }
+    override fun onTranscriptionReceived(source: String, translated: String) {}
 
     override fun onError(message: String) {
         runOnUiThread {
@@ -117,5 +125,9 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     override fun onDestroy() {
         super.onDestroy()
         callManager?.stopCall()
+        
+        // Restore original audio mode
+        audioManager.mode = savedAudioMode
+        audioManager.isSpeakerphoneOn = false
     }
 }
