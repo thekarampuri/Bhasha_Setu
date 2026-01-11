@@ -1,26 +1,85 @@
 package com.example.voicetranslate
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.example.voicetranslate.data.repository.UserRepository
 import com.example.voicetranslate.databinding.ActivityMainBinding
+import kotlinx.coroutines.launch
 
 /**
- * Placeholder MainActivity for WebRTC rebuild
+ * Home screen for call setup
  * 
- * TODO: Implement WebRTC-based voice translation
- * - WebRTC peer connection setup
- * - SDP/ICE signaling
- * - Media stream handling
+ * Features:
+ * - Display user ID (copyable)
+ * - Input field for call ID
+ * - Start call button
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var userRepository: UserRepository
+    private var userId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
-        // Placeholder UI - will be replaced with WebRTC implementation
+        userRepository = UserRepository(this)
+        
+        setupUI()
+        loadUserId()
+    }
+    
+    private fun setupUI() {
+        // Copy user ID button
+        binding.btnCopyUserId.setOnClickListener {
+            copyUserIdToClipboard()
+        }
+        
+        // Start call button
+        binding.btnStartCall.setOnClickListener {
+            val callId = binding.etCallId.text.toString().trim()
+            
+            if (callId.isEmpty()) {
+                Toast.makeText(this, "Please enter a Call ID", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            
+            startCall(callId)
+        }
+    }
+    
+    private fun loadUserId() {
+        lifecycleScope.launch {
+            val user = userRepository.getUser()
+            userId = user.userId
+            
+            // Display shortened user ID (first 8 chars)
+            val shortId = userId.take(8)
+            binding.tvUserId.text = "$shortId..."
+        }
+    }
+    
+    private fun copyUserIdToClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("User ID", userId)
+        clipboard.setPrimaryClip(clip)
+        
+        Toast.makeText(this, "User ID copied to clipboard", Toast.LENGTH_SHORT).show()
+    }
+    
+    private fun startCall(callId: String) {
+        val intent = Intent(this, CallActivity::class.java).apply {
+            putExtra("CALL_ID", callId)
+            putExtra("USER_ID", userId)
+        }
+        startActivity(intent)
     }
 }
