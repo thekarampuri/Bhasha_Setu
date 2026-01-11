@@ -2,6 +2,7 @@ package com.example.voicetranslate.audio
 
 import kotlin.math.abs
 import kotlin.math.sqrt
+import com.example.voicetranslate.util.Constants
 
 /**
  * Voice Activity Detection (VAD) to filter out silence and low-energy audio.
@@ -26,7 +27,7 @@ class VoiceActivityDetector(
         
         // Reject very short audio chunks (< 300ms, reduced from 500ms)
         if (durationMs < minSpeechDurationMs) {
-            android.util.Log.d("VAD", "⏭️ Audio too short: ${durationMs}ms < ${minSpeechDurationMs}ms")
+            android.util.Log.d(Constants.Log.TAG_VAD, "⏭️ Audio too short: ${durationMs}ms < ${minSpeechDurationMs}ms")
             return false
         }
         
@@ -44,7 +45,7 @@ class VoiceActivityDetector(
         
         val isSpeech = hasEnergy && hasValidZCR
         
-        android.util.Log.d("VAD", "🎤 VAD Analysis: duration=${durationMs}ms, energy=${"%.4f".format(energy)}, zcr=${"%.3f".format(zcr)}, threshold=${"%.4f".format(energyThreshold)}, isSpeech=$isSpeech")
+        android.util.Log.d(Constants.Log.TAG_VAD, "🎤 VAD Analysis: duration=${durationMs}ms, energy=${"%.4f".format(energy)}, zcr=${"%.3f".format(zcr)}, threshold=${"%.4f".format(energyThreshold)}, isSpeech=$isSpeech")
         
         return isSpeech
     }

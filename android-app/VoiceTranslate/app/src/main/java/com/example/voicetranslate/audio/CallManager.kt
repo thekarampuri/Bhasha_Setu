@@ -10,6 +10,7 @@ import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
 import java.util.*
 import org.json.JSONObject
+import com.example.voicetranslate.util.Constants
 
 class CallManager(
     private val backendUrl: String, 
@@ -30,13 +31,13 @@ class CallManager(
         .build()
     private var webSocket: WebSocket? = null
 
-    private val SAMPLE_RATE = 16000
-    private val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
-    private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
-    private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
+    private val SAMPLE_RATE = Constants.Audio.SAMPLE_RATE
+    private val CHANNEL_IN = Constants.Audio.CHANNEL_IN
+    private val CHANNEL_OUT = Constants.Audio.CHANNEL_OUT
+    private val ENCODING = Constants.Audio.ENCODING
     
-    private val CHUNK_SIZE = 6400  // 0.2s chunks for capture
-    private val SEND_THRESHOLD = 80000  // Send every 2.5s for complete sentences (matches backend)
+    private val CHUNK_SIZE = Constants.Audio.CHUNK_SIZE
+    private val SEND_THRESHOLD = Constants.Audio.SEND_THRESHOLD
     
     private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 2
 
@@ -45,11 +46,11 @@ class CallManager(
     private var isActive = false
     private var isMuted = false
     
-    private val GAIN_FACTOR = 3.0f
+    private val GAIN_FACTOR = Constants.Audio.GAIN_FACTOR
     
     private val vad = VoiceActivityDetector(
-        energyThreshold = 0.01f,  // LOWERED from 0.02f for better speech detection
-        minSpeechDurationMs = 300  // REDUCED from 500ms to 300ms
+        energyThreshold = Constants.VAD.ENERGY_THRESHOLD,
+        minSpeechDurationMs = Constants.VAD.MIN_SPEECH_DURATION_MS
     )
     
     private var lastTranscript = ""
@@ -65,13 +66,13 @@ class CallManager(
     
     fun setPushToTalkMode(enabled: Boolean) {
         isPushToTalkMode = enabled
-        Log.d("CallManager", "Push-to-Talk mode: ${if (enabled) "ENABLED" else "DISABLED"}")
+        Log.d(Constants.Log.TAG_CALL_MANAGER, "Push-to-Talk mode: ${if (enabled) "ENABLED" else "DISABLED"}")
     }
     
     fun setPushToTalkActive(active: Boolean) {
         if (isPushToTalkMode) {
             isPushToTalkActive = active
-            Log.d("CallManager", "Push-to-Talk: ${if (active) "PRESSED" else "RELEASED"}")
+            Log.d(Constants.Log.TAG_CALL_MANAGER, "Push-to-Talk: ${if (active) "PRESSED" else "RELEASED"}")
         }
     }
     
@@ -118,11 +119,11 @@ class CallManager(
                             lastTranscriptTime = currentTime
                             listener.onTranscriptionReceived(source, translated)
                         } else {
-                            Log.d("CallManager", "Suppressed duplicate: $source")
+                            Log.d(Constants.Log.TAG_CALL_MANAGER, "Suppressed duplicate: $source")
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("CallManager", "Error parsing JSON: ${e.message}")
+                    Log.e(Constants.Log.TAG_CALL_MANAGER, "Error parsing JSON: ${e.message}")
                 }
             }
 
@@ -172,18 +173,18 @@ class CallManager(
         if (AcousticEchoCanceler.isAvailable()) {
             val aec = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
             aec?.enabled = true
-            Log.d("CallManager", "✅ Acoustic Echo Canceler enabled")
+            Log.d(Constants.Log.TAG_CALL_MANAGER, "✅ Acoustic Echo Canceler enabled")
         }
         
         if (NoiseSuppressor.isAvailable()) {
             val ns = NoiseSuppressor.create(audioRecord!!.audioSessionId)
             ns?.enabled = true
-            Log.d("CallManager", "✅ Noise Suppressor enabled")
+            Log.d(Constants.Log.TAG_CALL_MANAGER, "✅ Noise Suppressor enabled")
         }
         
         audioRecord?.startRecording()
         
-        Log.d("CallManager", "🎙️ Audio capture started: sampleRate=$SAMPLE_RATE, chunkSize=$CHUNK_SIZE, sendThreshold=$SEND_THRESHOLD")
+        Log.d(Constants.Log.TAG_CALL_MANAGER, "🎙️ Audio capture started: sampleRate=$SAMPLE_RATE, chunkSize=$CHUNK_SIZE, sendThreshold=$SEND_THRESHOLD")
         
         Thread {
             val captureBuffer = ByteArray(CHUNK_SIZE)
@@ -198,7 +199,7 @@ class CallManager(
                         totalBytesSent += read
                         
                         if (totalBytesSent % 32000 == 0) {  // Log every ~1 second
-                            Log.d("CallManager", "📤 Sent ${totalBytesSent} bytes total")
+                            Log.d(Constants.Log.TAG_CALL_MANAGER, "📤 Sent ${totalBytesSent} bytes total")
                         }
                         
                         sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
@@ -206,9 +207,9 @@ class CallManager(
                         if (sendBuffer.size >= SEND_THRESHOLD) {
                             val audioChunk = sendBuffer.toByteArray()
                             if (vad.isSpeech(audioChunk, SAMPLE_RATE)) {
-                                Log.d("CallManager", "✅ Speech detected, sending ${audioChunk.size} bytes for STT")
+                                Log.d(Constants.Log.TAG_CALL_MANAGER, "✅ Speech detected, sending ${audioChunk.size} bytes for STT")
                             } else {
-                                Log.d("CallManager", "🔇 No speech detected, skipping STT")
+                                Log.d(Constants.Log.TAG_CALL_MANAGER, "🔇 No speech detected, skipping STT")
                             }
                             sendBuffer.clear()
                         }

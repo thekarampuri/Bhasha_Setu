@@ -6,26 +6,16 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.voicetranslate.databinding.ActivityMainBinding
-
-data class Language(val name: String, val code: String) {
-    override fun toString(): String = name
-}
+import com.example.voicetranslate.data.model.Language
+import com.example.voicetranslate.data.repository.PreferencesRepository
+import com.example.voicetranslate.util.Constants
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val languages = listOf(
-        Language("English", "en"),
-        Language("Marathi", "mr"),
-        Language("Hindi", "hi"),
-        Language("Bengali", "bn"),
-        Language("Gujarati", "gu"),
-        Language("Kannada", "kn"),
-        Language("Malayalam", "ml"),
-        Language("Punjabi", "pa"),
-        Language("Tamil", "ta"),
-        Language("Telugu", "te")
-    )
+    private lateinit var prefsRepository: PreferencesRepository
+    
+    private val languages = Language.SUPPORTED_LANGUAGES
     
     private var sourceLanguageCode: String? = "en"  // Default to English
     private var targetLanguageCode: String? = "hi"  // Default to Hindi
@@ -34,6 +24,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        prefsRepository = PreferencesRepository(this)
 
         setupLanguageDropdowns()
         setupBackendUrl()
@@ -60,17 +52,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Save URL for next time
-            getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
-                .putString("backend_url", url)
-                .apply()
+            prefsRepository.saveBackendUrl(url)
 
-            android.util.Log.d("MainActivity", "Starting call with: URL=$url, CallID=$callId, Source=$sourceLanguageCode, Target=$targetLanguageCode")
+            android.util.Log.d(Constants.Log.TAG_MAIN, "Starting call with: URL=$url, CallID=$callId, Source=$sourceLanguageCode, Target=$targetLanguageCode")
 
             val intent = Intent(this, CallActivity::class.java).apply {
-                putExtra("BACKEND_URL", url)
-                putExtra("CALL_ID", callId)
-                putExtra("SOURCE_LANG", sourceLanguageCode)
-                putExtra("TARGET_LANG", targetLanguageCode)
+                putExtra(Constants.Extras.BACKEND_URL, url)
+                putExtra(Constants.Extras.CALL_ID, callId)
+                putExtra(Constants.Extras.SOURCE_LANG, sourceLanguageCode)
+                putExtra(Constants.Extras.TARGET_LANG, targetLanguageCode)
             }
             startActivity(intent)
         }
@@ -98,8 +88,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBackendUrl() {
-        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        val savedUrl = prefs.getString("backend_url", "192.168.1.10:8000")
+        val savedUrl = prefsRepository.getBackendUrl()
         binding.etBackendUrl.setText(savedUrl)
     }
 }

@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.voicetranslate.audio.CallManager
 import com.example.voicetranslate.databinding.ActivityCallBinding
+import com.example.voicetranslate.util.Constants
 
 class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
@@ -55,12 +56,12 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         savedAudioMode = audioManager.mode
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         
-        backendUrl = intent.getStringExtra("BACKEND_URL") ?: ""
-        callId = intent.getStringExtra("CALL_ID") ?: ""
-        sourceLang = intent.getStringExtra("SOURCE_LANG") ?: "en"
-        targetLang = intent.getStringExtra("TARGET_LANG") ?: "en"
+        backendUrl = intent.getStringExtra(Constants.Extras.BACKEND_URL) ?: ""
+        callId = intent.getStringExtra(Constants.Extras.CALL_ID) ?: ""
+        sourceLang = intent.getStringExtra(Constants.Extras.SOURCE_LANG) ?: "en"
+        targetLang = intent.getStringExtra(Constants.Extras.TARGET_LANG) ?: "en"
         
-        android.util.Log.d("CallActivity", "Received intent extras: URL=$backendUrl, CallID=$callId, Source=$sourceLang, Target=$targetLang")
+        android.util.Log.d(Constants.Log.TAG_CALL, "Received intent extras: URL=$backendUrl, CallID=$callId, Source=$sourceLang, Target=$targetLang")
         
         setupUI()
         checkPermissionAndStart()
@@ -240,7 +241,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             binding.scrollViewTranscript.fullScroll(View.FOCUS_DOWN)
         }
         
-        android.util.Log.d("CallActivity", "Added message: ${if (isLocal) "You" else "Them"}: $sourceText -> $translatedText")
+        android.util.Log.d(Constants.Log.TAG_CALL, "Added message: ${if (isLocal) "You" else "Them"}: $sourceText -> $translatedText")
     }
 
     override fun onError(message: String) {
