@@ -76,7 +76,51 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             finish() 
         }
 
-        binding.btnPushToTalk.visibility = View.GONE
+        // Push-to-Talk button (optional mode for noisy environments)
+        binding.btnPushToTalk.visibility = View.VISIBLE
+        binding.btnPushToTalk.text = "Enable PTT Mode"
+        
+        var isPTTMode = false
+        
+        binding.btnPushToTalk.setOnClickListener {
+            isPTTMode = !isPTTMode
+            callManager?.setPushToTalkMode(isPTTMode)
+            
+            if (isPTTMode) {
+                binding.btnPushToTalk.text = "🎙️ Hold to Speak"
+                binding.btnPushToTalk.setBackgroundColor(
+                    ContextCompat.getColor(this, android.R.color.holo_red_dark)
+                )
+                binding.tvCallStatus.text = "Status: PTT Mode - Hold button to speak"
+                
+                // Switch to touch listener for hold-to-speak
+                binding.btnPushToTalk.setOnTouchListener { _, event ->
+                    when (event.action) {
+                        android.view.MotionEvent.ACTION_DOWN -> {
+                            callManager?.setPushToTalkActive(true)
+                            binding.btnPushToTalk.alpha = 1.0f
+                            binding.tvCallStatus.text = "Status: 🔴 Recording..."
+                            true
+                        }
+                        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                            callManager?.setPushToTalkActive(false)
+                            binding.btnPushToTalk.alpha = 0.7f
+                            binding.tvCallStatus.text = "Status: PTT Mode - Hold button to speak"
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            } else {
+                binding.btnPushToTalk.text = "Enable PTT Mode"
+                binding.btnPushToTalk.setBackgroundColor(
+                    ContextCompat.getColor(this, android.R.color.holo_blue_dark)
+                )
+                binding.btnPushToTalk.setOnTouchListener(null)
+                binding.btnPushToTalk.alpha = 1.0f
+                binding.tvCallStatus.text = "Status: Continuous Mode"
+            }
+        }
         
         // Clear the placeholder message
         binding.llConversationHistory.removeAllViews()

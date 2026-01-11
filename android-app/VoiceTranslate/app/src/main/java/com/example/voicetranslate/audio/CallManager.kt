@@ -54,9 +54,38 @@ class CallManager(
     
     private var lastTranscript = ""
     private var lastTranscriptTime = 0L
+    
+    // Push-to-Talk mode
+    private var isPushToTalkMode = false
+    private var isPushToTalkActive = false
 
     fun setMuted(muted: Boolean) {
         isMuted = muted
+    }
+    
+    fun setPushToTalkMode(enabled: Boolean) {
+        isPushToTalkMode = enabled
+        Log.d("CallManager", "Push-to-Talk mode: ${if (enabled) "ENABLED" else "DISABLED"}")
+    }
+    
+    fun setPushToTalkActive(active: Boolean) {
+        if (isPushToTalkMode) {
+            isPushToTalkActive = active
+            Log.d("CallManager", "Push-to-Talk: ${if (active) "PRESSED" else "RELEASED"}")
+        }
+    }
+    
+    private fun shouldSendAudio(): Boolean {
+        // Don't send if muted
+        if (isMuted) return false
+        
+        // In PTT mode, only send when button is pressed
+        if (isPushToTalkMode) {
+            return isPushToTalkActive
+        }
+        
+        // In continuous mode, always send
+        return true
     }
 
     fun startCall() {
@@ -164,7 +193,7 @@ class CallManager(
             while (isActive) {
                 val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
                 if (read > 0) {
-                    if (!isMuted) {
+                    if (shouldSendAudio()) {
                         webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
                         totalBytesSent += read
                         
@@ -183,6 +212,9 @@ class CallManager(
                             }
                             sendBuffer.clear()
                         }
+                    } else {
+                        // Clear buffer when not sending to prevent stale audio
+                        sendBuffer.clear()
                     }
                 }
             }
