@@ -2,16 +2,16 @@
 
 Android client for the Bhasha Setu real-time voice communication system.
 
-> [!NOTE]
-> **Current Phase**: Phase 1 - Audio Relay Only  
-> This app currently supports real-time audio streaming between participants. Translation features (STT/TTS) will be added in Phase 2.
+> [!WARNING]
+> **Status**: Under Reconstruction - Rebuilding with WebRTC  
+> The previous AudioRecord + WebSocket PCM relay implementation has been removed. The project is being rebuilt from scratch using WebRTC for peer-to-peer voice communication.
 
-## Features
+## Planned Features (WebRTC Implementation)
 
-- **Real-time Voice Communication**: WebSocket-based audio streaming
+- **Real-time Voice Communication**: WebRTC peer-to-peer audio streaming
 - **Room-based Calls**: Join calls using shared Call IDs
 - **Audio Controls**: Mute and speaker controls
-- **Multi-language Support**: Ready for Phase 2 translation (10+ languages planned)
+- **Multi-language Support**: Translation features (10+ languages planned)
 
 ## Architecture
 
