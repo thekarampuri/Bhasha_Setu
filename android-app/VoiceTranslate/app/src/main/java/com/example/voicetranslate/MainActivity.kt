@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
         setupLanguageDropdowns()
         setupBackendUrl()
+        setupCallId()
 
         binding.btnStartCall.setOnClickListener {
             val url = binding.etBackendUrl.text.toString().trim()
@@ -91,5 +92,11 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val savedUrl = prefs.getString("backend_url", "unspectacularly-whinier-joseph.ngrok-free.dev")
         binding.etBackendUrl.setText(savedUrl)
+    }
+    
+    private fun setupCallId() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val savedCallId = prefs.getString("call_id", "test123")
+        binding.etCallId.setText(savedCallId)
     }
 }

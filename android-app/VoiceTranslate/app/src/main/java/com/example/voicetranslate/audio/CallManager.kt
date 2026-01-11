@@ -27,9 +27,11 @@ class CallManager(
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS) // Increased timeout for slower local networks
+        .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(30, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS) // Keep connection alive
+        .retryOnConnectionFailure(true)
         .build()
     
     private var webSocket: WebSocket? = null
@@ -39,17 +41,20 @@ class CallManager(
     private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     
-    private val CHUNK_SIZE = 6400 
-    private val SEND_THRESHOLD = 80000 
+    // Optimized for low latency and good quality
+    private val CHUNK_SIZE = 3200  // 0.1s chunks (100ms) - good balance between latency and quality
+    private val SEND_THRESHOLD = 80000  // Keep for STT processing
     
-    private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 2
+    // Larger buffer for smoother playback
+    private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 4
 
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
     private var isActive = false
     private var isMuted = false
     
-    private val GAIN_FACTOR = 3.0f
+    // Reduced gain for clearer audio with less distortion
+    private val GAIN_FACTOR = 2.0f
     
     private val vad = VoiceActivityDetector(
         energyThreshold = 0.01f,
@@ -211,6 +216,7 @@ class CallManager(
                     .setEncoding(ENCODING).setSampleRate(SAMPLE_RATE).setChannelMask(CHANNEL_OUT).build())
                 .setBufferSizeInBytes(bufferSize)
                 .setTransferMode(AudioTrack.MODE_STREAM)
+                .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
                 .build()
             audioTrack?.play()
         } catch (e: Exception) {
