@@ -10,6 +10,7 @@ import okio.ByteString.Companion.toByteString
 import java.util.concurrent.TimeUnit
 import java.util.*
 import org.json.JSONObject
+import kotlin.math.*
 
 class CallManager(
     private val backendUrl: String, 
@@ -26,8 +27,11 @@ class CallManager(
     }
 
     private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS) // Increased timeout for slower local networks
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(30, TimeUnit.SECONDS)
         .build()
+    
     private var webSocket: WebSocket? = null
 
     private val SAMPLE_RATE = 16000
@@ -35,8 +39,8 @@ class CallManager(
     private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     
-    private val CHUNK_SIZE = 6400  // 0.2s chunks for capture
-    private val SEND_THRESHOLD = 80000  // Send every 2.5s for complete sentences (matches backend)
+    private val CHUNK_SIZE = 6400 
+    private val SEND_THRESHOLD = 80000 
     
     private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 2
 
@@ -48,14 +52,13 @@ class CallManager(
     private val GAIN_FACTOR = 3.0f
     
     private val vad = VoiceActivityDetector(
-        energyThreshold = 0.01f,  // LOWERED from 0.02f for better speech detection
-        minSpeechDurationMs = 300  // REDUCED from 500ms to 300ms
+        energyThreshold = 0.01f,
+        minSpeechDurationMs = 300
     )
     
     private var lastTranscript = ""
     private var lastTranscriptTime = 0L
     
-    // Push-to-Talk mode
     private var isPushToTalkMode = false
     private var isPushToTalkActive = false
 
@@ -65,36 +68,23 @@ class CallManager(
     
     fun setPushToTalkMode(enabled: Boolean) {
         isPushToTalkMode = enabled
-        Log.d("CallManager", "Push-to-Talk mode: ${if (enabled) "ENABLED" else "DISABLED"}")
     }
     
     fun setPushToTalkActive(active: Boolean) {
-        if (isPushToTalkMode) {
-            isPushToTalkActive = active
-            Log.d("CallManager", "Push-to-Talk: ${if (active) "PRESSED" else "RELEASED"}")
-        }
+        if (isPushToTalkMode) isPushToTalkActive = active
     }
     
-    private fun shouldSendAudio(): Boolean {
-        // Don't send if muted
-        if (isMuted) return false
-        
-        // In PTT mode, only send when button is pressed
-        if (isPushToTalkMode) {
-            return isPushToTalkActive
-        }
-        
-        // In continuous mode, always send
-        return true
-    }
+    private fun shouldSendAudio(): Boolean = if (isMuted) false else if (isPushToTalkMode) isPushToTalkActive else true
 
     fun startCall() {
-        val sanitizedUrl = backendUrl
-            .replace("http://", "")
-            .replace("ws://", "")
-            .removeSuffix("/")
+        // Remove any protocol prefixes or leading slashes from user input
+        val host = backendUrl.trim()
+            .replace(Regex("^(http://|https://|ws://|wss://|/+)"), "")
+            .replace(Regex("/+$"), "")
 
-        val wsUrl = "ws://$sanitizedUrl/ws/call/$callId/$sourceLang/$targetLang"
+        val wsUrl = "ws://$host/ws/call/$callId/$sourceLang/$targetLang"
+        
+        Log.d("CallManager", "Connecting to WebSocket: $wsUrl")
         
         val request = Request.Builder().url(wsUrl).build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
@@ -111,18 +101,15 @@ class CallManager(
                     if (json.getString("type") == "transcription") {
                         val source = json.getString("source")
                         val translated = json.getString("translated")
-                        
                         val currentTime = System.currentTimeMillis()
                         if (source != lastTranscript || (currentTime - lastTranscriptTime) > 10000) {
                             lastTranscript = source
                             lastTranscriptTime = currentTime
                             listener.onTranscriptionReceived(source, translated)
-                        } else {
-                            Log.d("CallManager", "Suppressed duplicate: $source")
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("CallManager", "Error parsing JSON: ${e.message}")
+                    Log.e("CallManager", "JSON Error: ${e.message}")
                 }
             }
 
@@ -133,7 +120,22 @@ class CallManager(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                listener.onError("Connection failed: ${t.message}")
+                val rawMessage = t.message ?: "Unknown Connection Error"
+                Log.e("CallManager", "Connection Failure: $rawMessage")
+                
+                // CLEANUP: Hide the leading slash "/" from the IP address in the error message
+                var displayError = rawMessage.replace(Regex("connect to /", RegexOption.IGNORE_CASE), "connect to ")
+                
+                // Add troubleshooting guidance based on common network errors
+                displayError = when {
+                    displayError.contains("timeout", ignoreCase = true) -> 
+                        "$displayError. Please check if your PC firewall is blocking port 8000 and ensure both devices are on the SAME Wi-Fi."
+                    displayError.contains("refused", ignoreCase = true) -> 
+                        "$displayError. Ensure the Python backend is actually running on $host."
+                    else -> displayError
+                }
+
+                listener.onError("Connection failed: $displayError")
                 stopCall()
             }
             
@@ -160,88 +162,69 @@ class CallManager(
 
     @SuppressLint("MissingPermission")
     private fun startCaptureLoop() {
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION, 
-            SAMPLE_RATE, 
-            CHANNEL_IN, 
-            ENCODING, 
-            bufferSize
-        )
-        
-        // Fix: Explicitly import AcousticEchoCanceler and NoiseSuppressor
-        if (AcousticEchoCanceler.isAvailable()) {
-            val aec = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
-            aec?.enabled = true
-            Log.d("CallManager", "✅ Acoustic Echo Canceler enabled")
-        }
-        
-        if (NoiseSuppressor.isAvailable()) {
-            val ns = NoiseSuppressor.create(audioRecord!!.audioSessionId)
-            ns?.enabled = true
-            Log.d("CallManager", "✅ Noise Suppressor enabled")
-        }
-        
-        audioRecord?.startRecording()
-        
-        Log.d("CallManager", "🎙️ Audio capture started: sampleRate=$SAMPLE_RATE, chunkSize=$CHUNK_SIZE, sendThreshold=$SEND_THRESHOLD")
-        
-        Thread {
-            val captureBuffer = ByteArray(CHUNK_SIZE)
-            val sendBuffer = mutableListOf<Byte>()
-            var totalBytesSent = 0
+        try {
+            audioRecord = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, SAMPLE_RATE, CHANNEL_IN, ENCODING, bufferSize)
             
-            while (isActive) {
-                val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
-                if (read > 0) {
-                    if (shouldSendAudio()) {
-                        webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
-                        totalBytesSent += read
-                        
-                        if (totalBytesSent % 32000 == 0) {  // Log every ~1 second
-                            Log.d("CallManager", "📤 Sent ${totalBytesSent} bytes total")
-                        }
-                        
-                        sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
-                        
-                        if (sendBuffer.size >= SEND_THRESHOLD) {
-                            val audioChunk = sendBuffer.toByteArray()
-                            if (vad.isSpeech(audioChunk, SAMPLE_RATE)) {
-                                Log.d("CallManager", "✅ Speech detected, sending ${audioChunk.size} bytes for STT")
-                            } else {
-                                Log.d("CallManager", "🔇 No speech detected, skipping STT")
-                            }
-                            sendBuffer.clear()
-                        }
-                    } else {
-                        // Clear buffer when not sending to prevent stale audio
-                        sendBuffer.clear()
+            audioRecord?.audioSessionId?.let { sessionId ->
+                if (sessionId != AudioRecord.ERROR_BAD_VALUE) {
+                    if (AcousticEchoCanceler.isAvailable()) {
+                        AcousticEchoCanceler.create(sessionId)?.enabled = true
+                    }
+                    if (NoiseSuppressor.isAvailable()) {
+                        NoiseSuppressor.create(sessionId)?.enabled = true
                     }
                 }
             }
-        }.start()
+            
+            audioRecord?.startRecording()
+            
+            Thread {
+                val captureBuffer = ByteArray(CHUNK_SIZE)
+                val sendBuffer = mutableListOf<Byte>()
+                while (isActive) {
+                    val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
+                    if (read > 0 && shouldSendAudio()) {
+                        webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
+                        sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
+                        if (sendBuffer.size >= SEND_THRESHOLD) {
+                            val audioChunk = sendBuffer.toByteArray()
+                            if (vad.isSpeech(audioChunk, SAMPLE_RATE)) {
+                                Log.d("CallManager", "Speech detected")
+                            }
+                            sendBuffer.clear()
+                        }
+                    }
+                }
+            }.start()
+        } catch (e: Exception) {
+            Log.e("CallManager", "Capture loop error: ${e.message}")
+        }
     }
 
     private fun startPlayback() {
-        audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build())
-            .setAudioFormat(AudioFormat.Builder()
-                .setEncoding(ENCODING)
-                .setSampleRate(SAMPLE_RATE)
-                .setChannelMask(CHANNEL_OUT)
-                .build())
-            .setBufferSizeInBytes(bufferSize)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
-        audioTrack?.play()
+        try {
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                .setAudioFormat(AudioFormat.Builder()
+                    .setEncoding(ENCODING).setSampleRate(SAMPLE_RATE).setChannelMask(CHANNEL_OUT).build())
+                .setBufferSizeInBytes(bufferSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+            audioTrack?.play()
+        } catch (e: Exception) {
+            Log.e("CallManager", "Playback error: ${e.message}")
+        }
     }
 
     fun stopCall() {
         isActive = false
-        audioRecord?.apply { stop(); release() }
-        audioTrack?.apply { stop(); release() }
+        audioRecord?.apply { try { stop(); release() } catch(e: Exception) {} }
+        audioTrack?.apply { try { stop(); release() } catch(e: Exception) {} }
         webSocket?.close(1000, "Done")
+        audioRecord = null
+        audioTrack = null
+        webSocket = null
     }
 }
