@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Backend temporary files
+android-app/VoiceTranslate/backend/temp_audio/
+android-app/VoiceTranslate/backend/*.wav
+android-app/VoiceTranslate/backend/*.mp3
+
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.ap_
+*.aab
+
+# Android Studio
+.idea/
+*.iml
+.gradle/
+build/
+captures/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ngrok
+ngrok.exe
+ngrok.yml
