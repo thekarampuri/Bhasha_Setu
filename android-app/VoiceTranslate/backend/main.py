@@ -1,170 +1,241 @@
-import os
+"""
+Main FastAPI application for Bhasha Setu backend.
+Handles WebSocket endpoints and orchestrates services.
+"""
 import asyncio
-import wave
-import uuid
-import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from stt import transcribe_and_translate
 import uvicorn
 
-app = FastAPI()
+from config import settings
+from services.audio_service import AudioService
+from services.stt_service import STTService
+from services.translation_service import TranslationService
+from services.websocket_service import WebSocketService
+from utils.logger import setup_logger, get_logger
+from utils.file_utils import safe_delete
 
+# Setup logging
+setup_logger("uvicorn", level=settings.server.log_level)
+setup_logger("fastapi", level=settings.server.log_level)
+logger = setup_logger(__name__, level=settings.server.log_level)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Bhasha Setu API",
+    description="Real-time voice translation backend",
+    version="2.0.0"
+)
+
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.server.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-rooms = {}
+# Initialize services
+audio_service = AudioService()
+stt_service = STTService()
+translation_service = TranslationService()
+websocket_service = WebSocketService()
 
-class ConnectionManager:
-    async def connect(self, websocket: WebSocket, call_id: str, user_id: str):
-        await websocket.accept()
-        if call_id not in rooms:
-            rooms[call_id] = {}
-        rooms[call_id][user_id] = websocket
-        print(f"✅ User {user_id} joined room {call_id}")
+logger.info("Bhasha Setu backend initialized")
+logger.info(f"Environment: {settings.environment}")
+logger.info(f"Whisper model: {settings.whisper.model_size}")
 
-    def disconnect(self, call_id: str, user_id: str):
-        if call_id in rooms:
-            if user_id in rooms[call_id]:
-                del rooms[call_id][user_id]
-            if not rooms[call_id]:
-                del rooms[call_id]
-        print(f"❌ User {user_id} left room {call_id}")
 
-    async def broadcast_json(self, data: dict, call_id: str):
-        if call_id in rooms:
-            for uid, ws in rooms[call_id].items():
-                try:
-                    await ws.send_json(data)
-                except:
-                    pass
-
-    async def relay_audio(self, data: bytes, call_id: str, sender_id: str):
-        if call_id in rooms:
-            for uid, ws in rooms[call_id].items():
-                if uid != sender_id:
-                    try:
-                        await ws.send_bytes(data)
-                    except:
-                        pass
-
-manager = ConnectionManager()
-
-# Ensure temp directory exists
-TEMP_DIR = "temp_audio"
-os.makedirs(TEMP_DIR, exist_ok=True)
-
-async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_lang: str):
-    """Background task to handle STT and Translation with unique filenames for Windows safety"""
+async def process_stt(
+    audio_data: bytes,
+    call_id: str,
+    source_lang: str,
+    target_lang: str
+) -> None:
+    """
+    Background task to handle STT and Translation.
     
-    # Validate minimum chunk size - REDUCED to 0.3s for faster processing
-    MIN_CHUNK_SIZE = 9600  # 0.3s * 16000 samples/s * 2 bytes/sample = 9600 bytes
+    Args:
+        audio_data: Raw PCM audio data
+        call_id: Call identifier
+        source_lang: Source language code
+        target_lang: Target language code
+    """
+    logger.debug(
+        f"Received audio chunk: {len(audio_data)} bytes for call {call_id}"
+    )
     
-    print(f"📥 Received audio chunk: {len(audio_data)} bytes for call {call_id}")
+    # Save audio chunk to file
+    temp_filename = audio_service.save_audio_chunk(
+        audio_data,
+        call_id,
+        source_lang
+    )
     
-    if len(audio_data) < MIN_CHUNK_SIZE:
-        print(f"⏭️ Skipping chunk: too small ({len(audio_data)} bytes, minimum: {MIN_CHUNK_SIZE})")
+    if temp_filename is None:
         return
     
-    # Use unique filename to avoid WinError 32 (file in use)
-    task_id = uuid.uuid4().hex
-    temp_filename = os.path.join(TEMP_DIR, f"stt_{call_id}_{source_lang}_{task_id}.wav")
-    
     try:
-        # Write WAV file
-        with wave.open(temp_filename, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(16000)
-            wf.writeframes(audio_data)
+        logger.info(f"Processing audio file: {temp_filename}")
         
-        print(f"💾 Saved audio to {temp_filename}, processing with Whisper...")
-
-        # Run model in a thread - PASS call_id for duplicate detection
+        # Check if audio is silent
+        if audio_service.is_audio_silent(temp_filename):
+            logger.debug("Audio is silent, skipping transcription")
+            return
+        
+        # Run STT in thread pool
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
-            None, 
-            transcribe_and_translate, 
-            temp_filename, 
-            source_lang, 
-            target_lang,
-            call_id  # Add call_id parameter
+            None,
+            stt_service.process,
+            temp_filename,
+            source_lang,
+            call_id
+        )
+        
+        # Check if transcription succeeded and has content
+        if not result.success:
+            logger.error(f"STT failed: {result.error}")
+            await websocket_service.broadcast_error(
+                call_id,
+                f"Transcription failed: {result.error}",
+                "STT_ERROR"
+            )
+            return
+        
+        if not result.source_text:
+            logger.debug("Transcription returned empty (filtered or silent)")
+            return
+        
+        # Translate
+        translated_text = translation_service.translate(
+            result.source_text,
+            source_lang,
+            target_lang
+        )
+        
+        # Broadcast result
+        logger.info(
+            f"[{call_id}] {source_lang}: {result.source_text} "
+            f"-> {target_lang}: {translated_text}"
+        )
+        
+        await websocket_service.broadcast_transcription(
+            call_id,
+            result.source_text,
+            translated_text,
+            source_lang
+        )
+    
+    except Exception as e:
+        logger.error(f"STT processing error: {e}", exc_info=True)
+        await websocket_service.broadcast_error(
+            call_id,
+            "Internal processing error",
+            "PROCESSING_ERROR"
+        )
+    
+    finally:
+        # Schedule file cleanup
+        asyncio.create_task(
+            safe_delete(temp_filename, delay=settings.server.cleanup_delay_seconds)
         )
 
-        if result["success"] and result["source_text"]:
-            print(f"📝 [{call_id}] {source_lang}: {result['source_text']} -> {target_lang}: {result['translated_text']}")
-            await manager.broadcast_json({
-                "type": "transcription",
-                "source": result["source_text"],
-                "translated": result["translated_text"],
-                "sender": source_lang
-            }, call_id)
-        elif result["success"]:
-            print(f"⚠️ Transcription returned empty (filtered or silent)")
-        else:
-            print(f"❌ Transcription failed: {result.get('error', 'Unknown error')}")
-            
-    except Exception as e:
-        print(f"STT Error: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        # Give Whisper a tiny moment to release the file handle and try to delete safely
-        asyncio.create_task(safe_delete(temp_filename))
-
-async def safe_delete(filepath: str, delay: int = 1):
-    """Attempt to delete a file after a short delay to handle Windows file locking"""
-    await asyncio.sleep(delay)
-    try:
-        if os.path.exists(filepath):
-            os.remove(filepath)
-    except Exception as e:
-        print(f"Cleanup Error for {filepath}: {e}")
 
 @app.websocket("/ws/call/{call_id}/{source_lang}/{target_lang}")
-async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: str, target_lang: str):
-    user_id = source_lang 
-    await manager.connect(websocket, call_id, user_id)
+async def websocket_endpoint(
+    websocket: WebSocket,
+    call_id: str,
+    source_lang: str,
+    target_lang: str
+):
+    """
+    WebSocket endpoint for real-time voice call with translation.
     
-    print(f"🔌 WebSocket connected: call_id={call_id}, user_id={user_id}, source={source_lang}, target={target_lang}")
+    Args:
+        websocket: WebSocket connection
+        call_id: Unique call identifier
+        source_lang: Source language code
+        target_lang: Target language code
+    """
+    user_id = source_lang  # Use source language as user identifier
     
+    await websocket_service.connect(websocket, call_id, user_id)
+    
+    logger.info(
+        f"WebSocket connected: call_id={call_id}, user_id={user_id}, "
+        f"source={source_lang}, target={target_lang}"
+    )
+    
+    # Audio buffer for accumulating chunks
     audio_buffer = bytearray()
-    # INCREASED to 2-3 seconds for complete sentence transcription
-    # 16kHz * 2 bytes/sample * 2.5 seconds = 80000 bytes
-    THRESHOLD = 80000
+    threshold = settings.audio.buffer_threshold_bytes
     
-    print(f"📊 Audio buffer threshold: {THRESHOLD} bytes ({THRESHOLD / 32000:.2f} seconds)")
-
+    logger.info(
+        f"Audio buffer threshold: {threshold} bytes "
+        f"({threshold / (settings.audio.sample_rate * settings.audio.sample_width):.2f} seconds)"
+    )
+    
     try:
         while True:
+            # Receive audio data
             data = await websocket.receive_bytes()
-            print(f"📡 Received {len(data)} bytes from {user_id}")
+            logger.debug(f"Received {len(data)} bytes from {user_id}")
             
             # 1. Immediate relay for real-time audio
-            await manager.relay_audio(data, call_id, user_id)
+            await websocket_service.relay_audio(data, call_id, user_id)
             
             # 2. Accumulate for STT
             audio_buffer.extend(data)
-            if len(audio_buffer) >= THRESHOLD:
+            
+            if len(audio_buffer) >= threshold:
                 chunk = bytes(audio_buffer)
-                print(f"🎯 Buffer threshold reached: {len(chunk)} bytes, sending for STT processing")
+                logger.info(
+                    f"Buffer threshold reached: {len(chunk)} bytes, "
+                    f"sending for STT processing"
+                )
                 audio_buffer.clear()  # Clear buffer to prevent contamination
-                # Use a task to process in background
-                asyncio.create_task(process_stt(chunk, call_id, source_lang, target_lang))
                 
+                # Process in background
+                asyncio.create_task(
+                    process_stt(chunk, call_id, source_lang, target_lang)
+                )
+    
     except WebSocketDisconnect:
-        print(f"❌ WebSocket disconnected: call_id={call_id}, user_id={user_id}")
-        manager.disconnect(call_id, user_id)
+        logger.info(f"WebSocket disconnected: call_id={call_id}, user_id={user_id}")
+        websocket_service.disconnect(call_id, user_id)
+    
     except Exception as e:
-        print(f"Error in WebSocket: {e}")
-        import traceback
-        traceback.print_exc()
-        manager.disconnect(call_id, user_id)
+        logger.error(f"WebSocket error: {e}", exc_info=True)
+        websocket_service.disconnect(call_id, user_id)
+
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "Bhasha Setu API",
+        "version": "2.0.0",
+        "status": "running",
+        "active_rooms": websocket_service.get_active_rooms()
+    }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "environment": settings.environment,
+        "active_rooms": len(websocket_service.get_active_rooms())
+    }
+
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host=settings.server.host,
+        port=settings.server.port,
+        log_level=settings.server.log_level.lower()
+    )
