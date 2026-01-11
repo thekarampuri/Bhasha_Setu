@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "VoiceTranslate"
-include(":app")
+include(":android")
  

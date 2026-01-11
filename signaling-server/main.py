@@ -13,6 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Simple room-based connection manager
 rooms = {}
 
 class ConnectionManager:
@@ -53,8 +54,9 @@ manager = ConnectionManager()
 async def root():
     return {
         "status": "running",
-        "mode": "audio_only",
-        "message": "Audio relay server - STT disabled"
+        "service": "Bhasha Setu Audio Relay",
+        "version": "1.0.0",
+        "active_rooms": len(rooms)
     }
 
 @app.websocket("/ws/call/{call_id}/{source_lang}/{target_lang}")
@@ -73,7 +75,7 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
             total_bytes_received += len(data)
             chunk_count += 1
             
-            # Log every 50 chunks (~10 seconds at 0.2s chunks)
+            # Log every 50 chunks (~5 seconds at 100ms chunks)
             if chunk_count % 50 == 0:
                 print(f"📡 [{user_id}] Received {chunk_count} chunks, {total_bytes_received:,} bytes total")
             
@@ -96,9 +98,9 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("🎙️ Audio-Only Relay Server")
+    print("Bhasha Setu - Audio Relay Server")
     print("=" * 60)
-    print("Mode: Audio relay only (STT disabled)")
+    print("Mode: Audio relay only (no STT/TTS)")
     print("Host: 0.0.0.0")
     print("Port: 8000")
     print("=" * 60)

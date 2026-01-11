@@ -1,247 +1,166 @@
-# VoiceTranslate (Bhasha Setu)
+# VoiceTranslate Android App
 
-A real-time bidirectional voice translation system that breaks language barriers through seamless communication.
+Android client for the Bhasha Setu real-time voice communication system.
 
-## Overview
-
-**Bhasha Setu** (Bridge of Languages) enables real-time voice communication between people speaking different languages. The system combines speech recognition, translation, and audio streaming to provide a natural conversation experience.
-
-## Architecture
-
-The project follows a **client-server architecture** with clean separation of concerns:
-
-### Backend (Python/FastAPI)
-
-```
-backend/
-├── config.py              # Centralized configuration
-├── models.py              # Pydantic data models
-├── main.py                # FastAPI application
-├── services/              # Business logic layer
-│   ├── audio_service.py
-│   ├── stt_service.py
-│   ├── translation_service.py
-│   └── websocket_service.py
-└── utils/                 # Shared utilities
-```
-
-**Key Features:**
-- Modular service-based architecture
-- Environment-based configuration
-- Dynamic Voice Activity Detection
-- Hallucination filtering for Whisper
-- Duplicate transcript suppression
-
-### Frontend (Android/Kotlin)
-
-```
-app/src/main/java/com/example/voicetranslate/
-├── data/                  # Data layer (models, repositories)
-├── audio/                 # Audio processing
-├── util/                  # Constants and utilities
-├── MainActivity.kt        # Configuration screen
-└── CallActivity.kt        # Call screen
-```
-
-**Key Features:**
-- Clean architecture with data/domain/presentation layers
-- Repository pattern for data access
-- Centralized constants
-- Real-time audio streaming
-- Push-to-Talk mode for noisy environments
-
-## Technology Stack
-
-### Backend
-- **Framework**: FastAPI
-- **WebSocket**: Native FastAPI WebSocket support
-- **STT**: faster-whisper (Whisper model)
-- **Translation**: Helsinki-NLP MarianMT models
-- **Configuration**: Pydantic Settings
-- **Audio Processing**: NumPy, wave
-
-### Frontend
-- **Language**: Kotlin
-- **Audio**: Android AudioRecord/AudioTrack APIs
-- **WebSocket**: OkHttp WebSocket
-- **UI**: View Binding, Material Components
+> [!NOTE]
+> **Current Phase**: Phase 1 - Audio Relay Only  
+> This app currently supports real-time audio streaming between participants. Translation features (STT/TTS) will be added in Phase 2.
 
 ## Features
 
-### ✅ Implemented
-- Real-time bidirectional voice communication
-- Speech-to-text transcription (Whisper)
-- Multi-language translation (10+ languages)
-- Dynamic Voice Activity Detection
-- Push-to-Talk mode
-- Duplicate suppression
-- Hallucination filtering
-- Environment-based configuration
-- Modular, maintainable architecture
+- **Real-time Voice Communication**: WebSocket-based audio streaming
+- **Room-based Calls**: Join calls using shared Call IDs
+- **Audio Controls**: Mute and speaker controls
+- **Multi-language Support**: Ready for Phase 2 translation (10+ languages planned)
 
-### 🚧 Future Enhancements
-- Text-to-Speech output
-- Group calling support
-- End-to-end encryption
-- Cloud deployment
-- Mobile app for iOS
-- Web client
+## Architecture
 
-## Supported Languages
+The app follows a clean architecture pattern with clear separation of concerns:
 
-- English (en)
-- Hindi (hi)
-- Marathi (mr)
-- Bengali (bn)
-- Gujarati (gu)
-- Kannada (kn)
-- Malayalam (ml)
-- Punjabi (pa)
-- Tamil (ta)
-- Telugu (te)
-
-## Quick Start
-
-### Backend Setup
-
-```bash
-cd android-app/VoiceTranslate/backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment (optional)
-cp .env.example .env
-
-# Run server
-python main.py
+```
+android/src/main/java/com/example/voicetranslate/
+├── data/                  # Data layer
+│   ├── model/             # Data models
+│   │   ├── CallConfig.kt
+│   │   ├── CallState.kt
+│   │   ├── TranscriptionMessage.kt
+│   │   │   ├── AudioConfig.kt
+│   │   └── Language.kt
+│   └── repository/        # Repository interfaces
+│       ├── CallRepository.kt
+│       └── PreferencesRepository.kt
+├── audio/                 # Audio processing
+│   ├── CallManager.kt     # WebSocket and audio management
+│   ├── VoiceActivityDetector.kt
+│   └── WavRecorder.kt
+├── util/                  # Utilities
+│   └── Constants.kt       # Centralized constants
+├── MainActivity.kt        # Language selection screen
+└── CallActivity.kt        # Call screen with transcription
 ```
 
-Server runs on `http://0.0.0.0:8000`
+## Setup
 
-### Android App Setup
+### Prerequisites
 
-1. Open `android-app/VoiceTranslate` in Android Studio
-2. Build and run on device/emulator
-3. Configure backend URL in the app
-4. Select languages and start call
+- Android Studio Arctic Fox or later
+- Android SDK 24+
+- Kotlin 1.5+
+- **Backend Server**: The signaling server must be running (see [`../signaling-server/README.md`](../signaling-server/README.md))
+
+### Building
+
+1. Open the project in Android Studio
+2. Sync Gradle files
+3. Build and run on device or emulator
+
+### Configuration
+
+The app requires the signaling server URL. You can configure this in the main screen:
+
+1. Enter server URL (e.g., `192.168.1.10:8000` or ngrok URL)
+2. Enter a call ID (shared between participants)
+3. Select source and target languages
+4. Tap "Start Call"
 
 ## Usage
 
-### Two-Device Setup
+### Starting a Call
 
-**Device 1:**
-1. Enter backend URL (e.g., `192.168.1.10:8000`)
-2. Enter call ID (e.g., `room123`)
-3. Select source language: English
-4. Select target language: Hindi
-5. Tap "Start Call"
+1. Launch the app
+2. Configure server URL and call ID
+3. Select your language (source) and the other person's language (target)
+4. Tap "Start Call"
+5. Grant microphone permission if prompted
 
-**Device 2:**
-1. Enter same backend URL
-2. Enter same call ID: `room123`
-3. Select source language: Hindi
-4. Select target language: English
-5. Tap "Start Call"
+### During a Call
 
-Now both users can speak in their native language and hear translations in real-time!
+- **Mute**: Tap "Mute" to stop sending audio
+- **Speaker**: Tap "Speaker" to toggle speakerphone
+- **End Call**: Tap the red "End Call" button
 
-## Configuration
+> [!NOTE]
+> Language selection is currently used for user identification. Translation features will be added in Phase 2.
 
-### Backend Configuration
+## Architecture Details
 
-Edit `.env` file or set environment variables:
+### Data Layer
 
-```bash
-# Whisper model size (tiny, base, small, medium, large)
-WHISPER__MODEL_SIZE=small
+- **Models**: Immutable data classes representing app entities
+- **Repositories**: Interfaces for data operations (preferences, call management)
 
-# Audio buffer duration (ms)
-AUDIO__BUFFER_THRESHOLD_DURATION_MS=2500
+### Audio Layer
 
-# VAD threshold
-VAD__BASE_THRESHOLD=0.003
+- **CallManager**: Manages WebSocket connection and audio streaming
+- **VoiceActivityDetector**: Detects speech vs silence to reduce false transcriptions
+- **WavRecorder**: Records audio to WAV format
 
-# Server port
-SERVER__PORT=8000
-```
+### UI Layer
 
-### Android Configuration
+- **MainActivity**: Language selection and configuration
+- **CallActivity**: Call screen with real-time transcription display
 
-Edit `Constants.kt` for audio parameters:
+### Constants
 
-```kotlin
-object Audio {
-    const val SAMPLE_RATE = 16000
-    const val CHUNK_SIZE = 6400
-    const val SEND_THRESHOLD = 80000
-}
-```
+All hardcoded values are centralized in `Constants.kt`:
+- Audio configuration (sample rate, chunk sizes)
+- VAD parameters
+- Network configuration
+- Logging tags
 
-## Architecture Improvements (v2.0)
+## Supported Languages
 
-This version includes a complete architecture refactoring:
+- English
+- Hindi
+- Marathi
+- Bengali
+- Gujarati
+- Kannada
+- Malayalam
+- Punjabi
+- Tamil
+- Telugu
 
-### Backend
-- ✅ Modular service layer (audio, STT, translation, WebSocket)
-- ✅ Centralized configuration with Pydantic
-- ✅ Environment variable support
-- ✅ Structured logging
-- ✅ Proper error handling
-- ✅ Clean separation of concerns
+## Permissions
 
-### Android
-- ✅ Data layer with models and repositories
-- ✅ Centralized constants
-- ✅ Repository pattern for preferences
-- ✅ Improved code organization
-- ✅ Better separation of UI and business logic
-
-## Project Status
-
-- ✅ Real-time voice call implemented
-- ✅ WebSocket communication established
-- ✅ AI translation modules active
-- ✅ Architecture refactored for maintainability
-- ✅ Production-ready configuration system
-
-## Development
-
-### Backend Development
-
-```bash
-# Install dev dependencies
-pip install -r requirements.txt
-
-# Run with auto-reload
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Android Development
-
-1. Open in Android Studio
-2. Enable auto-import for Gradle
-3. Use Android Emulator or physical device
-4. Check logcat for debugging
+The app requires the following permissions:
+- `RECORD_AUDIO`: For capturing voice input
+- `INTERNET`: For WebSocket communication
 
 ## Troubleshooting
 
-See individual README files:
-- [Backend README](android-app/VoiceTranslate/backend/README.md)
-- [Android README](android-app/VoiceTranslate/README.md)
+### No Audio Transmission
 
-## Contributing
+- Check microphone permission
+- Verify backend URL is correct
+- Ensure both devices use the same call ID
 
-This project is developed for academic and learning purposes.
+### Poor Transcription Quality
 
-## Author
+- Use Push-to-Talk mode in noisy environments
+- Speak clearly and at moderate pace
+- Ensure good network connection
 
-**Akhil K**
+### Connection Issues
+
+- Verify backend server is running
+- Check firewall settings
+- Ensure devices are on the same network (for local testing)
+
+## Development
+
+### Adding New Languages
+
+1. Add language to `Language.SUPPORTED_LANGUAGES` in `Language.kt`
+2. Ensure backend has corresponding translation model
+
+### Customizing Audio Parameters
+
+Edit values in `Constants.Audio`:
+- `SAMPLE_RATE`: Audio sample rate (default: 16000 Hz)
+- `CHUNK_SIZE`: Capture chunk size
+- `SEND_THRESHOLD`: Buffer size for transcription
 
 ## License
 
-See LICENSE file for details.
-
----
-
-**Note**: This is an educational project demonstrating real-time voice translation using modern AI/ML techniques and clean software architecture principles.
+See LICENSE file in the root directory.
