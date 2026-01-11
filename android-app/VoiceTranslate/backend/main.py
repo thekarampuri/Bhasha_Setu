@@ -61,6 +61,13 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_lang: str):
     """Background task to handle STT and Translation with unique filenames for Windows safety"""
+    
+    # Validate minimum chunk size (at least 0.5s of audio at 16kHz, 16-bit)
+    MIN_CHUNK_SIZE = 16000  # 0.5s * 16000 samples/s * 2 bytes/sample = 16000 bytes
+    if len(audio_data) < MIN_CHUNK_SIZE:
+        print(f"⏭️ Skipping chunk: too small ({len(audio_data)} bytes)")
+        return
+    
     # Use unique filename to avoid WinError 32 (file in use)
     task_id = uuid.uuid4().hex
     temp_filename = os.path.join(TEMP_DIR, f"stt_{call_id}_{source_lang}_{task_id}.wav")
@@ -73,9 +80,16 @@ async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_
             wf.setframerate(16000)
             wf.writeframes(audio_data)
 
-        # Run model in a thread
+        # Run model in a thread - PASS call_id for duplicate detection
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, transcribe_and_translate, temp_filename, source_lang, target_lang)
+        result = await loop.run_in_executor(
+            None, 
+            transcribe_and_translate, 
+            temp_filename, 
+            source_lang, 
+            target_lang,
+            call_id  # Add call_id parameter
+        )
 
         if result["success"] and result["source_text"]:
             print(f"📝 [{call_id}] {source_lang}: {result['source_text']} -> {target_lang}: {result['translated_text']}")
@@ -107,8 +121,9 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
     await manager.connect(websocket, call_id, user_id)
     
     audio_buffer = bytearray()
-    # Process every ~2 seconds of audio
-    THRESHOLD = 64000 
+    # Process every 2-3 seconds of audio for better accuracy
+    # 16kHz * 2 bytes/sample * 2.5 seconds = 80000 bytes
+    THRESHOLD = 80000
 
     try:
         while True:
@@ -120,7 +135,7 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
             audio_buffer.extend(data)
             if len(audio_buffer) >= THRESHOLD:
                 chunk = bytes(audio_buffer)
-                audio_buffer.clear()
+                audio_buffer.clear()  # Clear buffer to prevent contamination
                 # Use a task to process in background
                 asyncio.create_task(process_stt(chunk, call_id, source_lang, target_lang))
                 

@@ -17,24 +17,87 @@ print(f"✅ Whisper model loaded.")
 
 # Common hallucination / filler phrases to filter out
 HALLUCINATION_FILTERS = [
-    "thank you", "thanks for watching", "subscribing", "subtitle", 
-    "please like and subscribe", "you", "th", "h", "..."
+    # Common YouTube/video artifacts
+    "thank you", "thanks for watching", "subscribing", "subscribe",
+    "please like and subscribe", "like and subscribe",
+    
+    # Common Whisper hallucinations
+    "subtitle", "subtitles", "amara.org", "www.mooji.org",
+    
+    # Single characters and short artifacts
+    "you", "th", "h", "a", "i", "the", "...", ".",
+    
+    # Music/sound artifacts
+    "music", "[music]", "(music)", "♪", "♫",
+    
+    # Silence artifacts
+    "", " ", "  ", "...",
+    
+    # Common filler words when alone
+    "um", "uh", "hmm", "mm", "ah", "oh", "eh"
 ]
 
-def is_audio_silent(file_path, threshold=0.01):
-    """Simple energy-based VAD (Voice Activity Detection)"""
+# Track recent transcripts to suppress duplicates
+recent_transcripts = {}
+DUPLICATE_WINDOW_SECONDS = 10
+
+def is_audio_silent(file_path, threshold=0.015, min_duration_seconds=0.5):
+    """Enhanced VAD with duration and energy checks"""
     try:
         with wave.open(file_path, 'rb') as wf:
             frames = wf.readframes(wf.getnframes())
+            sample_rate = wf.getframerate()
             audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
-            if len(audio) == 0: return True
+            
+            # Check minimum duration
+            duration = len(audio) / sample_rate
+            if duration < min_duration_seconds:
+                print(f"⏭️ Skipping audio: too short ({duration:.2f}s)")
+                return True
+            
+            if len(audio) == 0:
+                return True
+            
+            # Calculate RMS energy
             energy = np.sqrt(np.mean(audio**2))
-            return energy < threshold
+            
+            # Additional check: peak amplitude
+            peak = np.max(np.abs(audio))
+            
+            is_silent = energy < threshold or peak < (threshold * 2)
+            if is_silent:
+                print(f"🔇 Silent audio detected: energy={energy:.4f}, peak={peak:.4f}")
+            
+            return is_silent
     except Exception as e:
         print(f"VAD Error: {e}")
         return True
 
-def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str):
+def is_duplicate_transcript(text, call_id, window_seconds=DUPLICATE_WINDOW_SECONDS):
+    """Check if this transcript was recently seen for this call"""
+    import time
+    current_time = time.time()
+    
+    # Clean up old entries
+    if call_id in recent_transcripts:
+        recent_transcripts[call_id] = {
+            t: timestamp for t, timestamp in recent_transcripts[call_id].items()
+            if current_time - timestamp < window_seconds
+        }
+    
+    # Check if duplicate
+    if call_id in recent_transcripts and text in recent_transcripts[call_id]:
+        print(f"🔁 Duplicate transcript suppressed: '{text}'")
+        return True
+    
+    # Store this transcript
+    if call_id not in recent_transcripts:
+        recent_transcripts[call_id] = {}
+    recent_transcripts[call_id][text] = current_time
+    
+    return False
+
+def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str, call_id: str = "default"):
     try:
         # 1. Voice Activity Detection / Silence Check
         if is_audio_silent(file_path):
@@ -57,7 +120,14 @@ def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str)
         
         # 3. Post-processing filters
         clean_text = source_text.lower().strip(" .?!")
+        
+        # Filter out hallucinations
         if not clean_text or clean_text in HALLUCINATION_FILTERS or len(clean_text) < 2:
+            print(f"🚫 Filtered hallucination: '{source_text}'")
+            return { "success": True, "source_text": "", "translated_text": "" }
+        
+        # Check for duplicates
+        if is_duplicate_transcript(source_text, call_id):
             return { "success": True, "source_text": "", "translated_text": "" }
 
         # 4. Translate using Hugging Face model
@@ -71,3 +141,4 @@ def transcribe_and_translate(file_path: str, source_lang: str, target_lang: str)
     except Exception as e:
         print(f"❌ STT Error: {e}")
         return { "success": False, "error": str(e) }
+

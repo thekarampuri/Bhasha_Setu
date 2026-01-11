@@ -32,7 +32,11 @@ class CallManager(
     private val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
     private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
-    private val CHUNK_SIZE = 1280 
+    
+    // Increased chunk size for better transcription accuracy (2-3 second chunks)
+    private val CHUNK_SIZE = 6400  // 0.2s chunks for capture
+    private val SEND_THRESHOLD = 48000  // Send every 1.5s of accumulated audio
+    
     private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 2
 
     private var audioRecord: AudioRecord? = null
@@ -40,7 +44,17 @@ class CallManager(
     private var isActive = false
     private var isMuted = false
     
-    private val GAIN_FACTOR = 3.0f 
+    private val GAIN_FACTOR = 3.0f
+    
+    // Voice Activity Detection
+    private val vad = VoiceActivityDetector(
+        energyThreshold = 0.02f,
+        minSpeechDurationMs = 500
+    )
+    
+    // Track last sent transcript to avoid duplicates
+    private var lastTranscript = ""
+    private var lastTranscriptTime = 0L
 
     fun setMuted(muted: Boolean) {
         isMuted = muted
@@ -70,7 +84,16 @@ class CallManager(
                     if (json.getString("type") == "transcription") {
                         val source = json.getString("source")
                         val translated = json.getString("translated")
-                        listener.onTranscriptionReceived(source, translated)
+                        
+                        // Client-side duplicate suppression
+                        val currentTime = System.currentTimeMillis()
+                        if (source != lastTranscript || (currentTime - lastTranscriptTime) > 10000) {
+                            lastTranscript = source
+                            lastTranscriptTime = currentTime
+                            listener.onTranscriptionReceived(source, translated)
+                        } else {
+                            Log.d("CallManager", "Suppressed duplicate: $source")
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e("CallManager", "Error parsing JSON: ${e.message}")
@@ -111,22 +134,60 @@ class CallManager(
 
     @SuppressLint("MissingPermission")
     private fun startCaptureLoop() {
+        // Use VOICE_COMMUNICATION with echo cancellation
         audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION, 
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION,  // Enables AEC, AGC, NS
             SAMPLE_RATE, 
             CHANNEL_IN, 
             ENCODING, 
             bufferSize
         )
         
+        // Enable acoustic echo cancellation if available
+        if (AcousticEchoCanceler.isAvailable()) {
+            val aec = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
+            aec?.enabled = true
+            Log.d("CallManager", "✅ Acoustic Echo Canceler enabled")
+        }
+        
+        // Enable noise suppression if available
+        if (NoiseSuppressor.isAvailable()) {
+            val ns = NoiseSuppressor.create(audioRecord!!.audioSessionId)
+            ns?.enabled = true
+            Log.d("CallManager", "✅ Noise Suppressor enabled")
+        }
+        
         audioRecord?.startRecording()
+        
         Thread {
-            val data = ByteArray(CHUNK_SIZE)
+            val captureBuffer = ByteArray(CHUNK_SIZE)
+            val sendBuffer = mutableListOf<Byte>()
+            
             while (isActive) {
-                val read = audioRecord?.read(data, 0, CHUNK_SIZE) ?: 0
+                val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
                 if (read > 0) {
                     if (!isMuted) {
-                        webSocket?.send(data.sliceArray(0 until read).toByteString())
+                        // Always relay audio immediately for real-time communication
+                        webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
+                        
+                        // Accumulate for STT processing with VAD
+                        sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
+                        
+                        // Send accumulated buffer for STT when threshold is reached
+                        if (sendBuffer.size >= SEND_THRESHOLD) {
+                            val audioChunk = sendBuffer.toByteArray()
+                            
+                            // Apply VAD before sending to backend for STT
+                            if (vad.isSpeech(audioChunk, SAMPLE_RATE)) {
+                                Log.d("CallManager", "✅ Speech detected, sending ${audioChunk.size} bytes for STT")
+                                // Audio already sent for relay, backend will process it
+                            } else {
+                                Log.d("CallManager", "🔇 No speech detected, skipping STT")
+                            }
+                            
+                            // Clear buffer to prevent contamination
+                            sendBuffer.clear()
+                        }
                     }
                 }
             }
