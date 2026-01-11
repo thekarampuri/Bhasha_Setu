@@ -62,10 +62,13 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_lang: str):
     """Background task to handle STT and Translation with unique filenames for Windows safety"""
     
-    # Validate minimum chunk size (at least 0.5s of audio at 16kHz, 16-bit)
-    MIN_CHUNK_SIZE = 16000  # 0.5s * 16000 samples/s * 2 bytes/sample = 16000 bytes
+    # Validate minimum chunk size - REDUCED from 16000 to 8000 (0.25s instead of 0.5s)
+    MIN_CHUNK_SIZE = 8000  # 0.25s * 16000 samples/s * 2 bytes/sample = 8000 bytes
+    
+    print(f"📥 Received audio chunk: {len(audio_data)} bytes for call {call_id}")
+    
     if len(audio_data) < MIN_CHUNK_SIZE:
-        print(f"⏭️ Skipping chunk: too small ({len(audio_data)} bytes)")
+        print(f"⏭️ Skipping chunk: too small ({len(audio_data)} bytes, minimum: {MIN_CHUNK_SIZE})")
         return
     
     # Use unique filename to avoid WinError 32 (file in use)
@@ -79,6 +82,8 @@ async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_
             wf.setsampwidth(2)
             wf.setframerate(16000)
             wf.writeframes(audio_data)
+        
+        print(f"💾 Saved audio to {temp_filename}, processing with Whisper...")
 
         # Run model in a thread - PASS call_id for duplicate detection
         loop = asyncio.get_event_loop()
@@ -99,9 +104,15 @@ async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_
                 "translated": result["translated_text"],
                 "sender": source_lang
             }, call_id)
+        elif result["success"]:
+            print(f"⚠️ Transcription returned empty (filtered or silent)")
+        else:
+            print(f"❌ Transcription failed: {result.get('error', 'Unknown error')}")
             
     except Exception as e:
         print(f"STT Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # Give Whisper a tiny moment to release the file handle and try to delete safely
         asyncio.create_task(safe_delete(temp_filename))
@@ -120,14 +131,20 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
     user_id = source_lang 
     await manager.connect(websocket, call_id, user_id)
     
+    print(f"🔌 WebSocket connected: call_id={call_id}, user_id={user_id}, source={source_lang}, target={target_lang}")
+    
     audio_buffer = bytearray()
-    # Process every 2-3 seconds of audio for better accuracy
-    # 16kHz * 2 bytes/sample * 2.5 seconds = 80000 bytes
-    THRESHOLD = 80000
+    # REDUCED from 80000 to 48000 bytes for faster processing (1.5 seconds instead of 2.5)
+    # 16kHz * 2 bytes/sample * 1.5 seconds = 48000 bytes
+    THRESHOLD = 48000
+    
+    print(f"📊 Audio buffer threshold: {THRESHOLD} bytes ({THRESHOLD / 32000:.1f} seconds)")
 
     try:
         while True:
             data = await websocket.receive_bytes()
+            print(f"📡 Received {len(data)} bytes from {user_id}")
+            
             # 1. Immediate relay
             await manager.relay_audio(data, call_id, user_id)
             
@@ -135,14 +152,18 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
             audio_buffer.extend(data)
             if len(audio_buffer) >= THRESHOLD:
                 chunk = bytes(audio_buffer)
+                print(f"🎯 Buffer threshold reached: {len(chunk)} bytes, sending for STT processing")
                 audio_buffer.clear()  # Clear buffer to prevent contamination
                 # Use a task to process in background
                 asyncio.create_task(process_stt(chunk, call_id, source_lang, target_lang))
                 
     except WebSocketDisconnect:
+        print(f"❌ WebSocket disconnected: call_id={call_id}, user_id={user_id}")
         manager.disconnect(call_id, user_id)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in WebSocket: {e}")
+        import traceback
+        traceback.print_exc()
         manager.disconnect(call_id, user_id)
 
 if __name__ == "__main__":

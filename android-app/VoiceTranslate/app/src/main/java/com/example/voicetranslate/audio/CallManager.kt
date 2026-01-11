@@ -48,8 +48,8 @@ class CallManager(
     private val GAIN_FACTOR = 3.0f
     
     private val vad = VoiceActivityDetector(
-        energyThreshold = 0.02f,
-        minSpeechDurationMs = 500
+        energyThreshold = 0.01f,  // LOWERED from 0.02f for better speech detection
+        minSpeechDurationMs = 300  // REDUCED from 500ms to 300ms
     )
     
     private var lastTranscript = ""
@@ -154,15 +154,24 @@ class CallManager(
         
         audioRecord?.startRecording()
         
+        Log.d("CallManager", "🎙️ Audio capture started: sampleRate=$SAMPLE_RATE, chunkSize=$CHUNK_SIZE, sendThreshold=$SEND_THRESHOLD")
+        
         Thread {
             val captureBuffer = ByteArray(CHUNK_SIZE)
             val sendBuffer = mutableListOf<Byte>()
+            var totalBytesSent = 0
             
             while (isActive) {
                 val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
                 if (read > 0) {
                     if (!isMuted) {
                         webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
+                        totalBytesSent += read
+                        
+                        if (totalBytesSent % 32000 == 0) {  // Log every ~1 second
+                            Log.d("CallManager", "📤 Sent ${totalBytesSent} bytes total")
+                        }
+                        
                         sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
                         
                         if (sendBuffer.size >= SEND_THRESHOLD) {

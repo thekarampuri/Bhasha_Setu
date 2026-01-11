@@ -41,15 +41,15 @@ HALLUCINATION_FILTERS = [
 recent_transcripts = {}
 DUPLICATE_WINDOW_SECONDS = 10
 
-def is_audio_silent(file_path, threshold=0.015, min_duration_seconds=0.5):
-    """Enhanced VAD with duration and energy checks"""
+def is_audio_silent(file_path, threshold=0.005, min_duration_seconds=0.3):
+    """Enhanced VAD with duration and energy checks - ADJUSTED for normal speech detection"""
     try:
         with wave.open(file_path, 'rb') as wf:
             frames = wf.readframes(wf.getnframes())
             sample_rate = wf.getframerate()
             audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
             
-            # Check minimum duration
+            # Check minimum duration (reduced from 0.5s to 0.3s)
             duration = len(audio) / sample_rate
             if duration < min_duration_seconds:
                 print(f"⏭️ Skipping audio: too short ({duration:.2f}s)")
@@ -64,9 +64,17 @@ def is_audio_silent(file_path, threshold=0.015, min_duration_seconds=0.5):
             # Additional check: peak amplitude
             peak = np.max(np.abs(audio))
             
-            is_silent = energy < threshold or peak < (threshold * 2)
+            # LOWERED thresholds for better speech detection
+            # threshold=0.005 (was 0.015), peak threshold also lowered
+            is_silent = energy < threshold or peak < (threshold * 1.5)
+            
+            # ALWAYS log energy levels for debugging
+            print(f"🎤 Audio analysis: duration={duration:.2f}s, energy={energy:.4f}, peak={peak:.4f}, threshold={threshold:.4f}, is_silent={is_silent}")
+            
             if is_silent:
-                print(f"🔇 Silent audio detected: energy={energy:.4f}, peak={peak:.4f}")
+                print(f"🔇 Audio rejected as silent")
+            else:
+                print(f"✅ Audio passed VAD check")
             
             return is_silent
     except Exception as e:

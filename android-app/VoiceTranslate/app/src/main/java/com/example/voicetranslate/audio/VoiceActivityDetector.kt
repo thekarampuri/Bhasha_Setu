@@ -24,8 +24,9 @@ class VoiceActivityDetector(
         // Calculate audio duration
         val durationMs = (audioData.size / 2.0 / sampleRate * 1000).toLong()
         
-        // Reject very short audio chunks (< 500ms)
+        // Reject very short audio chunks (< 300ms, reduced from 500ms)
         if (durationMs < minSpeechDurationMs) {
+            android.util.Log.d("VAD", "⏭️ Audio too short: ${durationMs}ms < ${minSpeechDurationMs}ms")
             return false
         }
         
@@ -41,7 +42,11 @@ class VoiceActivityDetector(
         val hasEnergy = energy > energyThreshold
         val hasValidZCR = zcr in 0.1f..0.5f
         
-        return hasEnergy && hasValidZCR
+        val isSpeech = hasEnergy && hasValidZCR
+        
+        android.util.Log.d("VAD", "🎤 VAD Analysis: duration=${durationMs}ms, energy=${"%.4f".format(energy)}, zcr=${"%.3f".format(zcr)}, threshold=${"%.4f".format(energyThreshold)}, isSpeech=$isSpeech")
+        
+        return isSpeech
     }
     
     /**
