@@ -91,12 +91,16 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
+        // Route audio to speakerphone or earpiece
         audioManager.isSpeakerphoneOn = isSpeakerOn
         binding.btnSpeaker.text = if (isSpeakerOn) "Speaker On" else "Speaker Off"
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
+        // System-level microphone mute for communication mode
+        audioManager.isMicrophoneMute = isMuted
+        // Inform the manager to handle local mute state if necessary
         callManager?.setMuted(isMuted)
         binding.btnMute.text = if (isMuted) "Unmute" else "Mute"
     }
@@ -128,8 +132,9 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         super.onDestroy()
         callManager?.stopCall()
         
-        // Restore original audio mode
+        // Restore original audio settings
         audioManager.mode = savedAudioMode
         audioManager.isSpeakerphoneOn = false
+        audioManager.isMicrophoneMute = false
     }
 }
