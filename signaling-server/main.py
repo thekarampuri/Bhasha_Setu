@@ -163,6 +163,7 @@ if __name__ == "__main__":
     print("Mode: SDP/ICE relay only (no media)")
     print("Rooms: 1-to-1 (max 2 users)")
     print("Host: 0.0.0.0")
-    print("Port: 8000")
+    print("Port: 8001")
     print("=" * 60)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
+
