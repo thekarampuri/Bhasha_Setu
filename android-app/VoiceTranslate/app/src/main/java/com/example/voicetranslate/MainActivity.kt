@@ -88,7 +88,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBackendUrl() {
-        val savedUrl = prefsRepository.getBackendUrl()
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val savedUrl = prefs.getString("backend_url", "unspectacularly-whinier-joseph.ngrok-free.dev")
         binding.etBackendUrl.setText(savedUrl)
     }
 }
