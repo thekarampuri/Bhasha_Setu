@@ -2,6 +2,8 @@ package com.example.voicetranslate.audio
 
 import android.annotation.SuppressLint
 import android.media.*
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import okhttp3.*
 import okio.ByteString.Companion.toByteString
@@ -33,7 +35,6 @@ class CallManager(
     private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
     private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     
-    // Increased chunk size for better transcription accuracy (2-3 second chunks)
     private val CHUNK_SIZE = 6400  // 0.2s chunks for capture
     private val SEND_THRESHOLD = 48000  // Send every 1.5s of accumulated audio
     
@@ -46,13 +47,11 @@ class CallManager(
     
     private val GAIN_FACTOR = 3.0f
     
-    // Voice Activity Detection
     private val vad = VoiceActivityDetector(
         energyThreshold = 0.02f,
         minSpeechDurationMs = 500
     )
     
-    // Track last sent transcript to avoid duplicates
     private var lastTranscript = ""
     private var lastTranscriptTime = 0L
 
@@ -78,14 +77,12 @@ class CallManager(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                // Handle JSON transcription messages
                 try {
                     val json = JSONObject(text)
                     if (json.getString("type") == "transcription") {
                         val source = json.getString("source")
                         val translated = json.getString("translated")
                         
-                        // Client-side duplicate suppression
                         val currentTime = System.currentTimeMillis()
                         if (source != lastTranscript || (currentTime - lastTranscriptTime) > 10000) {
                             lastTranscript = source
@@ -134,23 +131,21 @@ class CallManager(
 
     @SuppressLint("MissingPermission")
     private fun startCaptureLoop() {
-        // Use VOICE_COMMUNICATION with echo cancellation
         audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_COMMUNICATION,  // Enables AEC, AGC, NS
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION, 
             SAMPLE_RATE, 
             CHANNEL_IN, 
             ENCODING, 
             bufferSize
         )
         
-        // Enable acoustic echo cancellation if available
+        // Fix: Explicitly import AcousticEchoCanceler and NoiseSuppressor
         if (AcousticEchoCanceler.isAvailable()) {
             val aec = AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
             aec?.enabled = true
             Log.d("CallManager", "✅ Acoustic Echo Canceler enabled")
         }
         
-        // Enable noise suppression if available
         if (NoiseSuppressor.isAvailable()) {
             val ns = NoiseSuppressor.create(audioRecord!!.audioSessionId)
             ns?.enabled = true
@@ -167,25 +162,16 @@ class CallManager(
                 val read = audioRecord?.read(captureBuffer, 0, CHUNK_SIZE) ?: 0
                 if (read > 0) {
                     if (!isMuted) {
-                        // Always relay audio immediately for real-time communication
                         webSocket?.send(captureBuffer.sliceArray(0 until read).toByteString())
-                        
-                        // Accumulate for STT processing with VAD
                         sendBuffer.addAll(captureBuffer.sliceArray(0 until read).toList())
                         
-                        // Send accumulated buffer for STT when threshold is reached
                         if (sendBuffer.size >= SEND_THRESHOLD) {
                             val audioChunk = sendBuffer.toByteArray()
-                            
-                            // Apply VAD before sending to backend for STT
                             if (vad.isSpeech(audioChunk, SAMPLE_RATE)) {
                                 Log.d("CallManager", "✅ Speech detected, sending ${audioChunk.size} bytes for STT")
-                                // Audio already sent for relay, backend will process it
                             } else {
                                 Log.d("CallManager", "🔇 No speech detected, skipping STT")
                             }
-                            
-                            // Clear buffer to prevent contamination
                             sendBuffer.clear()
                         }
                     }
