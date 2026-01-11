@@ -134,9 +134,9 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
     print(f"🔌 WebSocket connected: call_id={call_id}, user_id={user_id}, source={source_lang}, target={target_lang}")
     
     audio_buffer = bytearray()
-    # OPTIMIZED for real-time: 0.5-0.7s chunks for faster transcription
-    # 16kHz * 2 bytes/sample * 0.625 seconds = 20000 bytes
-    THRESHOLD = 20000
+    # INCREASED to 2-3 seconds for complete sentence transcription
+    # 16kHz * 2 bytes/sample * 2.5 seconds = 80000 bytes
+    THRESHOLD = 80000
     
     print(f"📊 Audio buffer threshold: {THRESHOLD} bytes ({THRESHOLD / 32000:.2f} seconds)")
 

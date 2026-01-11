@@ -36,7 +36,7 @@ class CallManager(
     private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
     
     private val CHUNK_SIZE = 6400  // 0.2s chunks for capture
-    private val SEND_THRESHOLD = 20000  // Send every 0.625s for real-time processing (matches backend)
+    private val SEND_THRESHOLD = 80000  // Send every 2.5s for complete sentences (matches backend)
     
     private val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING).coerceAtLeast(CHUNK_SIZE) * 2
 

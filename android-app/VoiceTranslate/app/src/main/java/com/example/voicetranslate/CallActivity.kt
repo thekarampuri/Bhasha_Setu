@@ -82,43 +82,62 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         
         var isPTTMode = false
         
+        // Click listener for toggling PTT mode
         binding.btnPushToTalk.setOnClickListener {
-            isPTTMode = !isPTTMode
-            callManager?.setPushToTalkMode(isPTTMode)
-            
-            if (isPTTMode) {
+            if (!isPTTMode) {
+                // Enable PTT mode
+                isPTTMode = true
+                callManager?.setPushToTalkMode(true)
+                
                 binding.btnPushToTalk.text = "🎙️ Hold to Speak"
                 binding.btnPushToTalk.setBackgroundColor(
                     ContextCompat.getColor(this, android.R.color.holo_red_dark)
                 )
+                binding.btnPushToTalk.alpha = 0.7f
                 binding.tvCallStatus.text = "Status: PTT Mode - Hold button to speak"
                 
-                // Switch to touch listener for hold-to-speak
-                binding.btnPushToTalk.setOnTouchListener { _, event ->
+                // Remove click listener and add touch listener
+                binding.btnPushToTalk.setOnClickListener(null)
+                binding.btnPushToTalk.setOnTouchListener { view, event ->
                     when (event.action) {
                         android.view.MotionEvent.ACTION_DOWN -> {
                             callManager?.setPushToTalkActive(true)
-                            binding.btnPushToTalk.alpha = 1.0f
+                            view.alpha = 1.0f
                             binding.tvCallStatus.text = "Status: 🔴 Recording..."
                             true
                         }
                         android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                             callManager?.setPushToTalkActive(false)
-                            binding.btnPushToTalk.alpha = 0.7f
+                            view.alpha = 0.7f
                             binding.tvCallStatus.text = "Status: PTT Mode - Hold button to speak"
                             true
                         }
                         else -> false
                     }
                 }
-            } else {
+            }
+        }
+        
+        // Add long-press to disable PTT mode
+        binding.btnPushToTalk.setOnLongClickListener {
+            if (isPTTMode) {
+                isPTTMode = false
+                callManager?.setPushToTalkMode(false)
+                callManager?.setPushToTalkActive(false)
+                
                 binding.btnPushToTalk.text = "Enable PTT Mode"
                 binding.btnPushToTalk.setBackgroundColor(
                     ContextCompat.getColor(this, android.R.color.holo_blue_dark)
                 )
-                binding.btnPushToTalk.setOnTouchListener(null)
                 binding.btnPushToTalk.alpha = 1.0f
                 binding.tvCallStatus.text = "Status: Continuous Mode"
+                
+                // Remove touch listener and restore click listener
+                binding.btnPushToTalk.setOnTouchListener(null)
+                setupUI() // Re-setup to restore click listener
+                true
+            } else {
+                false
             }
         }
         
@@ -154,6 +173,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
     override fun onTranscriptionReceived(source: String, translated: String) {
         runOnUiThread {
+            // Messages from remote user (not from this device)
             addMessageToConversation(source, translated, isLocal = false)
         }
     }
@@ -176,7 +196,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             )
         }
         
-        // Label (You / Them)
+        // Label (You / Them) - FIXED: Now properly shows who spoke
         val labelView = TextView(this).apply {
             text = if (isLocal) "You:" else "Them:"
             textSize = 12f
@@ -196,7 +216,8 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
         val transLabelView = TextView(this).apply {
             text = "Translation:"
             textSize = 11f
-            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.darker_gray))
+            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.white))
+            alpha = 0.7f
         }
         
         // Translated text
@@ -219,7 +240,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             binding.scrollViewTranscript.fullScroll(View.FOCUS_DOWN)
         }
         
-        android.util.Log.d("CallActivity", "Added message: $sourceText -> $translatedText")
+        android.util.Log.d("CallActivity", "Added message: ${if (isLocal) "You" else "Them"}: $sourceText -> $translatedText")
     }
 
     override fun onError(message: String) {
