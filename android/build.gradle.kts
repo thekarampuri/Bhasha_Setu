@@ -44,7 +44,12 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.material)
     
-    // WebRTC dependencies will be added here
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+    
+    // Networking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
