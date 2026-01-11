@@ -41,15 +41,38 @@ HALLUCINATION_FILTERS = [
 recent_transcripts = {}
 DUPLICATE_WINDOW_SECONDS = 10
 
-def is_audio_silent(file_path, threshold=0.005, min_duration_seconds=0.3):
-    """Enhanced VAD with duration and energy checks - ADJUSTED for normal speech detection"""
+# Track audio statistics for dynamic VAD
+audio_stats = {
+    'recent_energies': [],
+    'recent_peaks': [],
+    'baseline_energy': 0.005,
+    'baseline_peak': 0.01
+}
+
+def update_audio_stats(energy, peak):
+    """Update rolling statistics for dynamic VAD threshold adjustment"""
+    audio_stats['recent_energies'].append(energy)
+    audio_stats['recent_peaks'].append(peak)
+    
+    # Keep only last 20 samples
+    if len(audio_stats['recent_energies']) > 20:
+        audio_stats['recent_energies'].pop(0)
+        audio_stats['recent_peaks'].pop(0)
+    
+    # Update baseline (median of recent values)
+    if len(audio_stats['recent_energies']) >= 5:
+        audio_stats['baseline_energy'] = np.median(audio_stats['recent_energies'])
+        audio_stats['baseline_peak'] = np.median(audio_stats['recent_peaks'])
+
+def is_audio_silent(file_path, base_threshold=0.003, min_duration_seconds=0.3):
+    """Dynamic VAD with adaptive thresholds and peak checks for soft speech detection"""
     try:
         with wave.open(file_path, 'rb') as wf:
             frames = wf.readframes(wf.getnframes())
             sample_rate = wf.getframerate()
             audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
             
-            # Check minimum duration (reduced from 0.5s to 0.3s)
+            # Check minimum duration (reduced to 0.3s for faster response)
             duration = len(audio) / sample_rate
             if duration < min_duration_seconds:
                 print(f"⏭️ Skipping audio: too short ({duration:.2f}s)")
@@ -61,20 +84,32 @@ def is_audio_silent(file_path, threshold=0.005, min_duration_seconds=0.3):
             # Calculate RMS energy
             energy = np.sqrt(np.mean(audio**2))
             
-            # Additional check: peak amplitude
+            # Calculate peak amplitude
             peak = np.max(np.abs(audio))
             
-            # LOWERED thresholds for better speech detection
-            # threshold=0.005 (was 0.015), peak threshold also lowered
-            is_silent = energy < threshold or peak < (threshold * 1.5)
+            # Update statistics for adaptive thresholds
+            update_audio_stats(energy, peak)
+            
+            # DYNAMIC threshold adjustment
+            # Use baseline + small margin, or base_threshold, whichever is lower
+            adaptive_energy_threshold = min(base_threshold, audio_stats['baseline_energy'] * 0.5)
+            adaptive_peak_threshold = min(base_threshold * 2, audio_stats['baseline_peak'] * 0.5)
+            
+            # Soft speech detection: pass if EITHER energy OR peak exceeds threshold
+            has_energy = energy > adaptive_energy_threshold
+            has_peak = peak > adaptive_peak_threshold
+            
+            is_silent = not (has_energy or has_peak)
             
             # ALWAYS log energy levels for debugging
-            print(f"🎤 Audio analysis: duration={duration:.2f}s, energy={energy:.4f}, peak={peak:.4f}, threshold={threshold:.4f}, is_silent={is_silent}")
+            print(f"🎤 Audio analysis: duration={duration:.2f}s, energy={energy:.4f}, peak={peak:.4f}")
+            print(f"   Thresholds: energy={adaptive_energy_threshold:.4f}, peak={adaptive_peak_threshold:.4f}")
+            print(f"   Baseline: energy={audio_stats['baseline_energy']:.4f}, peak={audio_stats['baseline_peak']:.4f}")
             
             if is_silent:
                 print(f"🔇 Audio rejected as silent")
             else:
-                print(f"✅ Audio passed VAD check")
+                print(f"✅ Audio passed VAD check (energy={has_energy}, peak={has_peak})")
             
             return is_silent
     except Exception as e:

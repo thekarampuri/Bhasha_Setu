@@ -62,8 +62,8 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 async def process_stt(audio_data: bytes, call_id: str, source_lang: str, target_lang: str):
     """Background task to handle STT and Translation with unique filenames for Windows safety"""
     
-    # Validate minimum chunk size - REDUCED from 16000 to 8000 (0.25s instead of 0.5s)
-    MIN_CHUNK_SIZE = 8000  # 0.25s * 16000 samples/s * 2 bytes/sample = 8000 bytes
+    # Validate minimum chunk size - REDUCED to 0.3s for faster processing
+    MIN_CHUNK_SIZE = 9600  # 0.3s * 16000 samples/s * 2 bytes/sample = 9600 bytes
     
     print(f"📥 Received audio chunk: {len(audio_data)} bytes for call {call_id}")
     
@@ -134,18 +134,18 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, source_lang: st
     print(f"🔌 WebSocket connected: call_id={call_id}, user_id={user_id}, source={source_lang}, target={target_lang}")
     
     audio_buffer = bytearray()
-    # REDUCED from 80000 to 48000 bytes for faster processing (1.5 seconds instead of 2.5)
-    # 16kHz * 2 bytes/sample * 1.5 seconds = 48000 bytes
-    THRESHOLD = 48000
+    # OPTIMIZED for real-time: 0.5-0.7s chunks for faster transcription
+    # 16kHz * 2 bytes/sample * 0.625 seconds = 20000 bytes
+    THRESHOLD = 20000
     
-    print(f"📊 Audio buffer threshold: {THRESHOLD} bytes ({THRESHOLD / 32000:.1f} seconds)")
+    print(f"📊 Audio buffer threshold: {THRESHOLD} bytes ({THRESHOLD / 32000:.2f} seconds)")
 
     try:
         while True:
             data = await websocket.receive_bytes()
             print(f"📡 Received {len(data)} bytes from {user_id}")
             
-            # 1. Immediate relay
+            # 1. Immediate relay for real-time audio
             await manager.relay_audio(data, call_id, user_id)
             
             # 2. Accumulate for STT

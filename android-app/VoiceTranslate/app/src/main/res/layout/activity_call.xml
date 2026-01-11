@@ -7,7 +7,7 @@
     android:background="@color/background_dark"
     android:padding="16dp">
 
-    <!-- Transcript Panel -->
+    <!-- Conversation History ScrollView -->
     <ScrollView
         android:id="@+id/scrollViewTranscript"
         android:layout_width="0dp"
@@ -21,39 +21,20 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
-            android:id="@+id/llTranscript"
+            android:id="@+id/llConversationHistory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="8dp">
 
+            <!-- Messages will be added dynamically here -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="You:"
-                android:textColor="@color/blue_light"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvYouPlaceholder"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="Speak something..."
-                android:textColor="@color/white" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Translated:"
-                android:textColor="@color/blue_light"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvTranslatedPlaceholder"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Translation will appear here"
-                android:textColor="@color/white" />
+                android:text="🎙️ Conversation will appear here..."
+                android:textColor="@color/gray_text"
+                android:layout_gravity="center"
+                android:padding="16dp" />
 
         </LinearLayout>
     </ScrollView>
@@ -70,7 +51,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- Push-to-Talk Button -->
+    <!-- Push-to-Talk Button (Hidden for continuous mode) -->
     <Button
         android:id="@+id/btnPushToTalk"
         android:layout_width="200dp"
@@ -82,6 +63,7 @@
         android:text="🎙 Hold to Speak"
         android:textAllCaps="false"
         android:textSize="18sp"
+        android:visibility="gone"
         app:cornerRadius="100dp"
         app:layout_constraintBottom_toTopOf="@+id/llControls"
         app:layout_constraintEnd_toEndOf="parent"

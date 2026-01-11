@@ -3,9 +3,13 @@ package com.example.voicetranslate
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.media.AudioManager
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -72,7 +76,10 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
             finish() 
         }
 
-        binding.btnPushToTalk.visibility = View.GONE 
+        binding.btnPushToTalk.visibility = View.GONE
+        
+        // Clear the placeholder message
+        binding.llConversationHistory.removeAllViews()
     }
 
     private fun checkPermissionAndStart() {
@@ -84,28 +91,92 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
     }
 
     private fun initiateCall() {
-        // Matches the updated CallManager constructor
         callManager = CallManager(backendUrl, callId, sourceLang, targetLang, this)
         callManager?.startCall()
     }
 
     private fun toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn
-        // Route audio to speakerphone or earpiece
         audioManager.isSpeakerphoneOn = isSpeakerOn
         binding.btnSpeaker.text = if (isSpeakerOn) "Speaker On" else "Speaker Off"
     }
 
     private fun toggleMute() {
         isMuted = !isMuted
-        // System-level microphone mute for communication mode
         audioManager.isMicrophoneMute = isMuted
-        // Inform the manager to handle local mute state if necessary
         callManager?.setMuted(isMuted)
         binding.btnMute.text = if (isMuted) "Unmute" else "Mute"
     }
 
-    override fun onTranscriptionReceived(source: String, translated: String) {}
+    override fun onTranscriptionReceived(source: String, translated: String) {
+        runOnUiThread {
+            addMessageToConversation(source, translated, isLocal = false)
+        }
+    }
+    
+    private fun addMessageToConversation(sourceText: String, translatedText: String, isLocal: Boolean) {
+        val messageContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 24)
+            }
+            setPadding(16, 12, 16, 12)
+            setBackgroundColor(
+                if (isLocal) 
+                    ContextCompat.getColor(this@CallActivity, android.R.color.holo_blue_dark)
+                else 
+                    ContextCompat.getColor(this@CallActivity, android.R.color.darker_gray)
+            )
+        }
+        
+        // Label (You / Them)
+        val labelView = TextView(this).apply {
+            text = if (isLocal) "You:" else "Them:"
+            textSize = 12f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.white))
+        }
+        
+        // Source text
+        val sourceView = TextView(this).apply {
+            text = sourceText
+            textSize = 16f
+            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.white))
+            setPadding(0, 4, 0, 8)
+        }
+        
+        // Translation label
+        val transLabelView = TextView(this).apply {
+            text = "Translation:"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.darker_gray))
+        }
+        
+        // Translated text
+        val translatedView = TextView(this).apply {
+            text = translatedText
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@CallActivity, android.R.color.white))
+            alpha = 0.9f
+        }
+        
+        messageContainer.addView(labelView)
+        messageContainer.addView(sourceView)
+        messageContainer.addView(transLabelView)
+        messageContainer.addView(translatedView)
+        
+        binding.llConversationHistory.addView(messageContainer)
+        
+        // Auto-scroll to bottom
+        binding.scrollViewTranscript.post {
+            binding.scrollViewTranscript.fullScroll(View.FOCUS_DOWN)
+        }
+        
+        android.util.Log.d("CallActivity", "Added message: $sourceText -> $translatedText")
+    }
 
     override fun onError(message: String) {
         runOnUiThread {
@@ -116,7 +187,7 @@ class CallActivity : AppCompatActivity(), CallManager.CallListener {
 
     override fun onConnected() {
         runOnUiThread {
-            binding.tvCallStatus.text = "Status: Relay Connected"
+            binding.tvCallStatus.text = "Status: Connected - Speaking..."
             Toast.makeText(this, "Audio Streaming Active", Toast.LENGTH_SHORT).show()
         }
     }
