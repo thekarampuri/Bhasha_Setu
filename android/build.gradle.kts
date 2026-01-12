@@ -52,6 +52,9 @@ dependencies {
     // Networking
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    
+    // WebRTC
+    implementation("org.webrtc:google-webrtc:1.0.32006")
 
     // Compose
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
