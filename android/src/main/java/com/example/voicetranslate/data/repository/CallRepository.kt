@@ -47,7 +47,7 @@ class CallRepository(
         Log.d(tag, "Starting call: $callId")
         
         currentCallId = callId
-        isInitiator = true
+        // Don't set isInitiator here - it will be determined when we connect
         
         val user = userRepository.getUser()
         currentUserId = user.userId
@@ -70,19 +70,26 @@ class CallRepository(
     private val signalingListener = object : SignalingClient.SignalingListener {
         override fun onConnected() {
             Log.d(tag, "✅ Connected to signaling server")
+            // We'll determine if we're the initiator when peer-joined event arrives
+            // If we get peer-joined immediately, we're the first (initiator)
+            // If we don't get it, we're waiting for the second user
         }
         
         override fun onPeerJoined(peerId: String?) {
             Log.d(tag, "👤 Peer joined: $peerId")
             
-            if (peerId != null && isInitiator) {
-                // We're the caller - create offer
-                Log.d(tag, "Creating offer (we're the caller)")
+            // Determine who is the initiator based on the current state
+            // If we were already CALLING, it means we joined first and peer just joined
+            // So we are the initiator
+            if (_callState.value == CallState.CALLING) {
+                isInitiator = true
+                Log.d(tag, "📞 We're the INITIATOR (joined first) - creating offer")
                 _callState.value = CallState.CONNECTING
                 webRtcClient?.createOffer()
-            } else if (peerId != null) {
-                // We're the callee - wait for offer
-                Log.d(tag, "Waiting for offer (we're the callee)")
+            } else {
+                // We joined second, peer was already there
+                isInitiator = false
+                Log.d(tag, "📞 We're the CALLEE (joined second) - waiting for offer")
                 _callState.value = CallState.RINGING
             }
         }

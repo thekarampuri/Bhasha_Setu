@@ -51,10 +51,16 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
     - user_id: Unique user identifier (UUID)
     """
     
+    from datetime import datetime
+    
+    def log(msg: str):
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(f"[{timestamp}] {msg}")
+    
     # Check room capacity (max 2 users)
     if call_id in rooms and len(rooms[call_id]) >= 2:
         await websocket.close(code=1008, reason="Room full")
-        print(f"❌ Room {call_id} is full, rejected {user_id}")
+        log(f"❌ Room {call_id} is full, rejected {user_id[:8]}")
         return
     
     # Accept connection
@@ -64,9 +70,12 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
     if call_id not in rooms:
         rooms[call_id] = {}
     
+    # Determine if this user is the initiator (first to join)
+    is_initiator = len(rooms[call_id]) == 0
+    
     # Add user to room
     rooms[call_id][user_id] = websocket
-    print(f"✅ User {user_id} joined room {call_id} ({len(rooms[call_id])}/2)")
+    log(f"✅ User {user_id[:8]} joined room {call_id} ({len(rooms[call_id])}/2) - {'INITIATOR' if is_initiator else 'CALLEE'}")
     
     # Notify peer if they exist
     peer_id = get_peer_id(call_id, user_id)
@@ -76,7 +85,7 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
             "callId": call_id,
             "peerId": user_id
         })
-        print(f"📢 Notified {peer_id} that {user_id} joined")
+        log(f"📢 Notified {peer_id[:8]} that {user_id[:8]} joined")
     
     try:
         # Message relay loop
@@ -86,16 +95,16 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
             message = json.loads(data)
             
             msg_type = message.get("type")
-            print(f"📨 [{user_id}] {msg_type}")
+            log(f"📨 [{user_id[:8]}] → {msg_type}")
             
             # Relay message to peer
             if msg_type in ["offer", "answer", "ice-candidate"]:
                 await send_to_peer(call_id, user_id, message)
             
     except WebSocketDisconnect:
-        print(f"❌ User {user_id} disconnected from room {call_id}")
+        log(f"❌ User {user_id[:8]} disconnected from room {call_id}")
     except Exception as e:
-        print(f"⚠️ Error for {user_id}: {e}")
+        log(f"⚠️ Error for {user_id[:8]}: {e}")
     finally:
         # Cleanup on disconnect
         cleanup_user(call_id, user_id)
@@ -121,9 +130,11 @@ async def send_to_peer(call_id: str, sender_id: str, message: dict):
         peer_ws = rooms[call_id][peer_id]
         try:
             await peer_ws.send_text(json.dumps(message))
-            print(f"📤 Relayed {message.get('type')} from {sender_id} to {peer_id}")
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            print(f"[{timestamp}] 📤 Relayed {message.get('type')} from {sender_id[:8]} to {peer_id[:8]}")
         except Exception as e:
-            print(f"⚠️ Failed to send to {peer_id}: {e}")
+            print(f"⚠️ Failed to send to {peer_id[:8]}: {e}")
 
 
 def cleanup_user(call_id: str, user_id: str):

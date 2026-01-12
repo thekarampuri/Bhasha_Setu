@@ -45,14 +45,20 @@ class MainActivity : AppCompatActivity() {
         
         // Start call button
         binding.btnStartCall.setOnClickListener {
+            val serverUrl = binding.etServerUrl.text.toString().trim()
             val callId = binding.etCallId.text.toString().trim()
+            
+            if (serverUrl.isEmpty()) {
+                Toast.makeText(this, "Please enter Server URL", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             
             if (callId.isEmpty()) {
                 Toast.makeText(this, "Please enter a Call ID", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             
-            startCall(callId)
+            startCall(serverUrl, callId)
         }
     }
     
@@ -75,9 +81,10 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "User ID copied to clipboard", Toast.LENGTH_SHORT).show()
     }
     
-    private fun startCall(callId: String) {
+    private fun startCall(serverUrl: String, callId: String) {
         val intent = Intent(this, CallActivity::class.java).apply {
             putExtra("CALL_ID", callId)
+            putExtra("SERVER_URL", serverUrl)
             putExtra("USER_ID", userId)
         }
         startActivity(intent)

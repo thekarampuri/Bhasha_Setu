@@ -28,10 +28,11 @@ class CallActivity : AppCompatActivity() {
     private lateinit var callRepository: CallRepository
     
     private var callId: String = ""
-    private var serverUrl: String = "192.168.1.10:8000" // TODO: Get from settings
+    private var serverUrl: String = ""
     
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
+        private const val DEFAULT_SERVER_URL = "192.168.1.10:8001" // Default signaling server
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,7 @@ class CallActivity : AppCompatActivity() {
         setContentView(binding.root)
         
         callId = intent.getStringExtra("CALL_ID") ?: ""
+        serverUrl = intent.getStringExtra("SERVER_URL") ?: DEFAULT_SERVER_URL
         
         if (callId.isEmpty()) {
             Toast.makeText(this, "Invalid Call ID", Toast.LENGTH_SHORT).show()
