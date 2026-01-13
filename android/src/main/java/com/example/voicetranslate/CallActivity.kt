@@ -58,20 +58,22 @@ class CallActivity : AppCompatActivity() {
     }
     
     private fun setupUI() {
-        binding.tvCallId.text = "Call ID: $callId"
+        binding.tvTargetId.text = callId
         
         // End call button
-        binding.btnEndCall.setOnClickListener {
+        binding.fabEndCall.setOnClickListener {
             endCall()
         }
         
         // Mute button (will be enabled when connected)
-        binding.btnMute.setOnClickListener {
+        binding.fabMute.setOnClickListener {
             callRepository.toggleMute()
         }
         
-        // Speaker button (disabled for now)
-        binding.btnSpeaker.isEnabled = false
+        // Speaker button
+        binding.fabSpeaker.setOnClickListener {
+            // Toggle speaker logic would go here
+        }
         
         // Observe call state
         lifecycleScope.launch {
@@ -136,10 +138,10 @@ class CallActivity : AppCompatActivity() {
             CallState.ENDED -> "Call Ended"
         }
         
-        binding.tvCallStatus.text = statusText
+        binding.tvDuration.text = statusText
         
         // Enable mute button when connected
-        binding.btnMute.isEnabled = (state == CallState.CONNECTED)
+        binding.fabMute.isEnabled = (state == CallState.CONNECTED)
         
         // End call if state is ENDED
         if (state == CallState.ENDED) {
@@ -149,7 +151,7 @@ class CallActivity : AppCompatActivity() {
     
     private fun updateMuteButton(muted: Boolean) {
         // Update button appearance based on mute state
-        binding.cardMute.alpha = if (muted) 1.0f else 0.5f
+        binding.fabMute.alpha = if (muted) 1.0f else 0.5f
     }
     
     private fun endCall() {
