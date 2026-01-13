@@ -1,133 +1,191 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/gradient_background">
+    android:background="@color/BackgroundPrimary"
+    tools:context=".CallActivity">
 
-    <!-- Status Card -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardStatus"
-        android:layout_width="0dp"
+    <!-- Header / Status -->
+    <TextView
+        android:id="@+id/tvTargetId"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:layout_marginTop="80dp"
-        app:cardBackgroundColor="#20FFFFFF"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="4dp"
+        android:layout_marginTop="32dp"
+        android:text="+81 17-6742-047"
+        android:textColor="@color/TextPrimary"
+        android:textSize="24sp"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvDuration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="00:35"
+        android:textColor="@color/TextTertiary"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvTargetId" />
+
+    <!-- Language Info Container -->
+    <LinearLayout
+        android:id="@+id/layoutLanguage"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvDuration">
+
+        <!-- Me Language -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Me"
+                android:textColor="@color/TextTertiary"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSourceLang"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="English"
+                android:textAllCaps="false"
+                android:textColor="@color/TextPrimary"
+                app:backgroundTint="@color/BackgroundTertiary"
+                app:cornerRadius="24dp"
+                app:icon="@drawable/ic_launcher_foreground"
+                app:iconSize="18dp"
+                app:iconTint="@color/TextPrimary" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginHorizontal="8dp"
+            android:layout_marginTop="16dp"
+            android:src="@android:drawable/ic_popup_sync"
+            app:tint="@color/TextTertiary" />
+
+        <!-- Other Person Language -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Other person"
+                android:textColor="@color/TextTertiary"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTargetLang"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="Japanese"
+                android:textAllCaps="false"
+                android:textColor="@color/TextPrimary"
+                app:backgroundTint="@color/AccentPrimary"
+                app:cornerRadius="24dp"
+                app:icon="@drawable/ic_launcher_foreground"
+                app:iconSize="18dp"
+                app:iconTint="@color/TextPrimary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Chat / Transcription Area -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvTranscription"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginVertical="16dp"
+        android:paddingHorizontal="16dp"
+        app:layout_constraintBottom_toTopOf="@+id/layoutControls"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutLanguage" />
+
+    <!-- Bottom Controls -->
+    <LinearLayout
+        android:id="@+id/layoutControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center">
+            android:gravity="center"
+            android:orientation="horizontal">
 
-            <!-- Call Status Text -->
-            <TextView
-                android:id="@+id/tvCallStatus"
+            <!-- Speaker Toggle -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabSpeaker"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Connecting..."
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginHorizontal="12dp"
+                android:src="@android:drawable/ic_lock_silent_mode_off"
+                app:backgroundTint="@color/BackgroundTertiary"
+                app:fabSize="normal"
+                app:tint="@color/TextPrimary" />
 
-            <!-- Call ID -->
-            <TextView
-                android:id="@+id/tvCallId"
+            <!-- Spacer for Dial Icon removal -->
+            <View
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="12dp" />
+
+            <!-- Mute Toggle -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabMute"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Call ID: test123"
-                android:textColor="#80FFFFFF"
-                android:textSize="14sp" />
+                android:layout_marginHorizontal="12dp"
+                android:src="@android:drawable/ic_btn_speak_now"
+                app:backgroundTint="@color/BackgroundTertiary"
+                app:fabSize="normal"
+                app:tint="@color/TextPrimary" />
 
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <!-- Control Buttons Container -->
-    <LinearLayout
-        android:id="@+id/layoutControls"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/cardStatus"
-        android:layout_marginBottom="80dp">
-
-        <!-- Mute Button -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardMute"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_margin="12dp"
-            app:cardBackgroundColor="#40FFFFFF"
-            app:cardCornerRadius="36dp"
-            app:cardElevation="8dp"
-            android:alpha="0.5">
-
-            <ImageButton
-                android:id="@+id/btnMute"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_btn_speak_now"
-                android:tint="#FFFFFF"
-                android:contentDescription="Mute"
-                android:enabled="false" />
-        </androidx.cardview.widget.CardView>
 
         <!-- End Call Button -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardEndCall"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_margin="12dp"
-            app:cardBackgroundColor="#FF6B6B"
-            app:cardCornerRadius="36dp"
-            app:cardElevation="12dp">
-
-            <ImageButton
-                android:id="@+id/btnEndCall"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_call"
-                android:tint="#FFFFFF"
-                android:contentDescription="End Call"
-                android:rotation="135" />
-        </androidx.cardview.widget.CardView>
-
-        <!-- Speaker Button -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardSpeaker"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_margin="12dp"
-            app:cardBackgroundColor="#40FFFFFF"
-            app:cardCornerRadius="36dp"
-            app:cardElevation="8dp"
-            android:alpha="0.5">
-
-            <ImageButton
-                android:id="@+id/btnSpeaker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_lock_silent_mode_off"
-                android:tint="#FFFFFF"
-                android:contentDescription="Speaker"
-                android:enabled="false" />
-        </androidx.cardview.widget.CardView>
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabEndCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:src="@android:drawable/ic_menu_call"
+            app:backgroundTint="@color/StatusError"
+            app:fabSize="normal"
+            app:tint="@color/TextPrimary" />
 
     </LinearLayout>
 

@@ -3,6 +3,7 @@ package com.example.voicetranslate.webrtc
 import android.content.Context
 import android.util.Log
 import org.webrtc.*
+import org.webrtc.audio.JavaAudioDeviceModule
 
 /**
  * WebRTC Client for audio-only calls
@@ -43,14 +44,28 @@ class WebRtcClient(
     fun initialize() {
         Log.d(tag, "Initializing WebRTC...")
         
+        // Initialize PeerConnectionFactory
         val options = PeerConnectionFactory.InitializationOptions.builder(context)
             .setEnableInternalTracer(false)
+            .setFieldTrials("")
             .createInitializationOptions()
         PeerConnectionFactory.initialize(options)
         
+        // Create audio device module
+        val audioDeviceModule = JavaAudioDeviceModule.builder(context)
+            .createAudioDeviceModule()
+        
+        // Build PeerConnectionFactory with audio support
         peerConnectionFactory = PeerConnectionFactory.builder()
-            .setOptions(PeerConnectionFactory.Options())
+            .setAudioDeviceModule(audioDeviceModule)
+            .setOptions(PeerConnectionFactory.Options().apply {
+                disableEncryption = false
+                disableNetworkMonitor = false
+            })
             .createPeerConnectionFactory()
+        
+        // Release audio device module after factory creation
+        audioDeviceModule.release()
         
         Log.d(tag, "✅ WebRTC initialized")
     }
@@ -211,22 +226,58 @@ class WebRtcClient(
     
     private val peerConnectionObserver = object : PeerConnection.Observer {
         override fun onIceCandidate(candidate: IceCandidate?) {
-            candidate?.let { listener.onIceCandidateGenerated(it) }
+            if (candidate != null) {
+                Log.d(tag, "🧊 ICE candidate generated: ${candidate.sdpMid}")
+                listener.onIceCandidateGenerated(candidate)
+            }
         }
+        
         override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-            state?.let { listener.onConnectionStateChanged(it) }
+            state?.let { 
+                Log.d(tag, "🔌 ICE connection state: $it")
+                listener.onConnectionStateChanged(it) 
+            }
         }
+        
+        override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {
+            Log.d(tag, "🔍 ICE gathering state: $state")
+        }
+        
         override fun onTrack(transceiver: RtpTransceiver?) {
+            Log.d(tag, "🎵 Track received: ${transceiver?.mediaType}")
             listener.onAudioTrackReceived()
         }
-        override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
-        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
-        override fun onIceConnectionReceivingChange(p0: Boolean) {}
-        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
-        override fun onAddStream(p0: MediaStream?) {}
-        override fun onRemoveStream(p0: MediaStream?) {}
-        override fun onDataChannel(p0: DataChannel?) {}
-        override fun onRenegotiationNeeded() {}
-        override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {}
+        
+        override fun onSignalingChange(state: PeerConnection.SignalingState?) {
+            Log.d(tag, "📡 Signaling state: $state")
+        }
+        
+        override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
+            Log.d(tag, "🗑️ ICE candidates removed: ${candidates?.size}")
+        }
+        
+        override fun onIceConnectionReceivingChange(receiving: Boolean) {
+            Log.d(tag, "📶 ICE receiving: $receiving")
+        }
+        
+        override fun onAddStream(stream: MediaStream?) {
+            Log.d(tag, "➕ Stream added (deprecated): ${stream?.id}")
+        }
+        
+        override fun onRemoveStream(stream: MediaStream?) {
+            Log.d(tag, "➖ Stream removed (deprecated): ${stream?.id}")
+        }
+        
+        override fun onDataChannel(dataChannel: DataChannel?) {
+            Log.d(tag, "📊 Data channel: ${dataChannel?.label()}")
+        }
+        
+        override fun onRenegotiationNeeded() {
+            Log.d(tag, "🔄 Renegotiation needed")
+        }
+        
+        override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) {
+            Log.d(tag, "➕ Track added: ${receiver?.track()?.kind()}")
+        }
     }
 }

@@ -46,22 +46,28 @@ class CallRepository(
     suspend fun startCall(serverUrl: String, callId: String) {
         Log.d(tag, "Starting call: $callId")
         
-        currentCallId = callId
-        // Don't set isInitiator here - it will be determined when we connect
-        
-        val user = userRepository.getUser()
-        currentUserId = user.userId
-        
-        // Initialize WebRTC
-        webRtcClient = WebRtcClient(context, webRtcListener)
-        webRtcClient?.initialize()
-        webRtcClient?.createPeerConnection()
-        
-        // Connect to signaling server
-        signalingClient = SignalingClient(serverUrl, signalingListener)
-        signalingClient?.connect(callId, user.userId)
-        
-        _callState.value = CallState.CALLING
+        try {
+            currentCallId = callId
+            // Don't set isInitiator here - it will be determined when we connect
+            
+            val user = userRepository.getUser()
+            currentUserId = user.userId
+            
+            // Initialize WebRTC
+            webRtcClient = WebRtcClient(context, webRtcListener)
+            webRtcClient?.initialize()
+            webRtcClient?.createPeerConnection()
+            
+            // Connect to signaling server
+            signalingClient = SignalingClient(serverUrl, signalingListener)
+            signalingClient?.connect(callId, user.userId)
+            
+            _callState.value = CallState.CALLING
+        } catch (e: Exception) {
+            Log.e(tag, "❌ Failed to start call: ${e.message}", e)
+            _callState.value = CallState.ENDED
+            throw e
+        }
     }
     
     /**

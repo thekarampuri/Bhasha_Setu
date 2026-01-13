@@ -58,7 +58,7 @@ android/src/main/java/com/example/voicetranslate/
 
 The app requires the signaling server URL. You can configure this in the main screen:
 
-1. Enter server URL (e.g., `192.168.1.10:8000` or ngrok URL)
+1. Enter server URL (e.g., `192.168.1.10:8001` for local or ngrok URL for remote)
 2. Enter a call ID (shared between participants)
 3. Select source and target languages
 4. Tap "Start Call"

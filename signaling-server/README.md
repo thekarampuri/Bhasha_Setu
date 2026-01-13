@@ -23,7 +23,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Server runs on `http://0.0.0.0:8000`
+Server runs on `http://0.0.0.0:8001`
 
 ## API
 
@@ -43,7 +43,7 @@ Response:
 
 ### WebSocket Endpoint
 ```
-ws://server:8000/ws/{call_id}/{user_id}
+ws://server:8001/ws/{call_id}/{user_id}
 ```
 
 **Parameters**:
@@ -52,7 +52,7 @@ ws://server:8000/ws/{call_id}/{user_id}
 
 **Example**:
 ```
-ws://localhost:8000/ws/call123/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+ws://localhost:8001/ws/call123/a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
 ## Message Protocol
@@ -133,10 +133,10 @@ ws://localhost:8000/ws/call123/a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ### Using websocat (CLI tool)
 ```bash
 # Terminal 1 (User A)
-websocat ws://localhost:8000/ws/call123/user_a
+websocat ws://localhost:8001/ws/call123/user_a
 
 # Terminal 2 (User B)
-websocat ws://localhost:8000/ws/call123/user_b
+websocat ws://localhost:8001/ws/call123/user_b
 
 # Send messages as JSON
 {"type": "offer", "callId": "call123", "sdp": "test"}
@@ -144,7 +144,7 @@ websocat ws://localhost:8000/ws/call123/user_b
 
 ### Using Browser Console
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/call123/user_a');
+const ws = new WebSocket('ws://localhost:8001/ws/call123/user_a');
 ws.onmessage = (e) => console.log('Received:', e.data);
 ws.send(JSON.stringify({type: 'offer', callId: 'call123', sdp: 'test'}));
 ```
@@ -153,8 +153,10 @@ ws.send(JSON.stringify({type: 'offer', callId: 'call123', sdp: 'test'}));
 
 ### Using ngrok (Development)
 ```bash
-ngrok http 8000
+ngrok http 8001
 ```
+
+Use the ngrok URL in the Android app's server URL field (e.g., `abc123.ngrok.io:443`)
 
 ### Using Docker
 ```dockerfile
@@ -169,7 +171,7 @@ CMD ["python", "main.py"]
 ### Environment Variables (Optional)
 ```bash
 export HOST=0.0.0.0
-export PORT=8000
+export PORT=8001
 ```
 
 ## Architecture
