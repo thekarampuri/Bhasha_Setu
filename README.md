@@ -129,6 +129,34 @@ The app requires the following permissions:
 
 ## Troubleshooting
 
+### WebRTC Connection Issues (FIXED - 2026-01-14)
+
+If User 2's connection terminates after 3-4 seconds, this has been fixed with:
+- ✅ Added TURN server support for better NAT traversal
+- ✅ Improved ICE configuration
+- ✅ Added 30-second connection timeout
+- ✅ Better error logging and diagnostics
+
+**See detailed documentation:**
+- [`docs/FIX_SUMMARY.md`](docs/FIX_SUMMARY.md) - Complete fix summary
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) - Comprehensive troubleshooting guide
+- [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) - Step-by-step testing instructions
+- [`docs/CONNECTION_FLOW.md`](docs/CONNECTION_FLOW.md) - Visual connection flow diagrams
+
+### Quick Troubleshooting
+
+#### "Connection timeout after 30 seconds"
+- Verify server URL is correct (e.g., `192.168.1.100:8001`)
+- Ensure signaling server is running
+- Check that both devices can reach the server
+- Try on a different network (mobile data vs WiFi)
+
+#### "Different User IDs on both apps"
+**This is NORMAL!** Each device has a unique User ID. Connection is established using the **Call ID** (room name), not User IDs.
+
+#### "Room full" error
+More than 2 users are trying to join the same room. Use a unique Call ID for each pair.
+
 ### No Audio Transmission
 
 - Check microphone permission
@@ -144,8 +172,10 @@ The app requires the following permissions:
 ### Connection Issues
 
 - Verify backend server is running
-- Check firewall settings
+- Check firewall settings (port 8001 for signaling)
 - Ensure devices are on the same network (for local testing)
+- Monitor logs: `adb logcat | grep -E "WebRtcClient|SignalingClient"`
+
 
 ## Development
 

@@ -7,6 +7,7 @@ import com.example.voicetranslate.webrtc.SignalingClient
 import com.example.voicetranslate.webrtc.WebRtcClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.*
 import org.webrtc.IceCandidate
 import org.webrtc.PeerConnection
 import org.webrtc.SessionDescription
@@ -39,6 +40,8 @@ class CallRepository(
     private var currentCallId: String = ""
     private var currentUserId: String = ""
     private var isInitiator: Boolean = false
+    private var connectionTimeoutJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     /**
      * Start outgoing call
@@ -63,12 +66,38 @@ class CallRepository(
             signalingClient?.connect(callId, user.userId)
             
             _callState.value = CallState.CALLING
+            
+            // Start connection timeout (30 seconds)
+            startConnectionTimeout()
         } catch (e: Exception) {
             Log.e(tag, "❌ Failed to start call: ${e.message}", e)
             _callState.value = CallState.ENDED
             throw e
         }
     }
+    
+    /**
+     * Start timeout for connection establishment
+     */
+    private fun startConnectionTimeout() {
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = scope.launch {
+            delay(30000) // 30 seconds
+            if (_callState.value != CallState.CONNECTED) {
+                Log.e(tag, "❌ Connection timeout - call failed to connect")
+                endCall()
+            }
+        }
+    }
+    
+    /**
+     * Cancel connection timeout
+     */
+    private fun cancelConnectionTimeout() {
+        connectionTimeoutJob?.cancel()
+        connectionTimeoutJob = null
+    }
+
     
     /**
      * SignalingClient listener
@@ -91,7 +120,11 @@ class CallRepository(
                 isInitiator = true
                 Log.d(tag, "📞 We're the INITIATOR (joined first) - creating offer")
                 _callState.value = CallState.CONNECTING
-                webRtcClient?.createOffer()
+                // Small delay to ensure peer is ready
+                scope.launch {
+                    delay(500)
+                    webRtcClient?.createOffer()
+                }
             } else {
                 // We joined second, peer was already there
                 isInitiator = false
@@ -193,6 +226,7 @@ class CallRepository(
                 PeerConnection.IceConnectionState.CONNECTED -> {
                     Log.d(tag, "✅ Call connected!")
                     _callState.value = CallState.CONNECTED
+                    cancelConnectionTimeout()
                 }
                 PeerConnection.IceConnectionState.DISCONNECTED -> {
                     Log.d(tag, "❌ Call disconnected")
@@ -246,6 +280,9 @@ class CallRepository(
         
         _callState.value = CallState.ENDED
         _isMuted.value = false
+        
+        cancelConnectionTimeout()
+        scope.cancel()
         
         Log.d(tag, "✅ Call ended")
     }

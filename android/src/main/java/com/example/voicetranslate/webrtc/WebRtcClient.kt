@@ -27,10 +27,21 @@ class WebRtcClient(
     private var localAudioTrack: AudioTrack? = null
     private var audioSource: AudioSource? = null
     
-    // ICE servers (STUN for NAT traversal)
+    // ICE servers (STUN + TURN for NAT traversal)
+    // Using free TURN servers from metered.ca for better connectivity
     private val iceServers = listOf(
+        // Google STUN servers
         PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
+        PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+        // Free TURN servers (metered.ca)
+        PeerConnection.IceServer.builder("turn:a.relay.metered.ca:80")
+            .setUsername("87e69f8c0c87b0fc5e056a36")
+            .setPassword("sBP6FRtpEfj3MgDL")
+            .createIceServer(),
+        PeerConnection.IceServer.builder("turn:a.relay.metered.ca:443")
+            .setUsername("87e69f8c0c87b0fc5e056a36")
+            .setPassword("sBP6FRtpEfj3MgDL")
+            .createIceServer()
     )
     
     interface WebRtcListener {
@@ -76,6 +87,10 @@ class WebRtcClient(
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            iceTransportsType = PeerConnection.IceTransportsType.ALL
+            bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
+            rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
+            tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
         }
         
         peerConnection = peerConnectionFactory?.createPeerConnection(
@@ -235,6 +250,18 @@ class WebRtcClient(
         override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
             state?.let { 
                 Log.d(tag, "🔌 ICE connection state: $it")
+                when (it) {
+                    PeerConnection.IceConnectionState.FAILED -> {
+                        Log.e(tag, "❌ ICE connection FAILED - check network/firewall")
+                    }
+                    PeerConnection.IceConnectionState.DISCONNECTED -> {
+                        Log.w(tag, "⚠️ ICE connection DISCONNECTED")
+                    }
+                    PeerConnection.IceConnectionState.CONNECTED -> {
+                        Log.d(tag, "✅ ICE connection CONNECTED successfully")
+                    }
+                    else -> {}
+                }
                 listener.onConnectionStateChanged(it) 
             }
         }

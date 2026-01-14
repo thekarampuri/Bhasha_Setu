@@ -89,7 +89,9 @@ class SignalingClient(
         
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(tag, "✅ WebSocket connected")
+                Log.d(tag, "✅ WebSocket connected to: $wsUrl")
+                Log.d(tag, "   Call ID: $callId")
+                Log.d(tag, "   User ID: ${userId.take(8)}...")
                 _connectionState.value = ConnectionState.Connected
                 listener.onConnected()
             }

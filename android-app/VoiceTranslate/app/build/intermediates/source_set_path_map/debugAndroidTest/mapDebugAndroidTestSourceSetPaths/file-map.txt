@@ -1,0 +1,5 @@
+com.example.voicetranslate.test.app-core-1.6.1-0 C:\Users\Admin\.gradle\caches\8.13\transforms\707a6ca0d40ca2205ef20d6b8eadb442\transformed\core-1.6.1\res
+com.example.voicetranslate.test.app-androidTest-1 E:\Projects\Bhasha_Setu\android-app\VoiceTranslate\app\build\generated\res\resValues\androidTest\debug
+com.example.voicetranslate.test.app-mergeDebugAndroidTestResources-2 E:\Projects\Bhasha_Setu\android-app\VoiceTranslate\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+com.example.voicetranslate.test.app-mergeDebugAndroidTestResources-3 E:\Projects\Bhasha_Setu\android-app\VoiceTranslate\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+com.example.voicetranslate.test.app-debugAndroidTest-4 E:\Projects\Bhasha_Setu\android-app\VoiceTranslate\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
