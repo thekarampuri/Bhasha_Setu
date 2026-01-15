@@ -3,6 +3,7 @@ package com.example.voicetranslate
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -32,18 +33,23 @@ class CallActivity : AppCompatActivity() {
     
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
-        private const val DEFAULT_SERVER_URL = "192.168.1.10:8001" // Default signaling server
+        private const val DEFAULT_SERVER_URL = "192.168.31.29:8001" // Updated to match actual network
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d("CallActivity", "=== CallActivity onCreate ===")
         binding = ActivityCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
         callId = intent.getStringExtra("CALL_ID") ?: ""
         serverUrl = intent.getStringExtra("SERVER_URL") ?: DEFAULT_SERVER_URL
         
+        Log.d("CallActivity", "Call ID: $callId")
+        Log.d("CallActivity", "Server URL: $serverUrl")
+        
         if (callId.isEmpty()) {
+            Log.e("CallActivity", "❌ Invalid Call ID")
             Toast.makeText(this, "Invalid Call ID", Toast.LENGTH_SHORT).show()
             finish()
             return
@@ -55,6 +61,7 @@ class CallActivity : AppCompatActivity() {
         
         setupUI()
         checkPermissionsAndStartCall()
+        Log.d("CallActivity", "CallActivity initialized")
     }
     
     private fun setupUI() {
@@ -91,9 +98,11 @@ class CallActivity : AppCompatActivity() {
     }
     
     private fun checkPermissionsAndStartCall() {
+        Log.d("CallActivity", "Checking audio permissions...")
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED) {
             // Request permission
+            Log.d("CallActivity", "Requesting RECORD_AUDIO permission")
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.RECORD_AUDIO),
@@ -101,6 +110,7 @@ class CallActivity : AppCompatActivity() {
             )
         } else {
             // Permission already granted
+            Log.d("CallActivity", "✅ Audio permission already granted")
             startCall()
         }
     }
@@ -114,8 +124,10 @@ class CallActivity : AppCompatActivity() {
         
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d("CallActivity", "✅ Audio permission granted by user")
                 startCall()
             } else {
+                Log.e("CallActivity", "❌ Audio permission denied")
                 Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
                 finish()
             }
@@ -123,8 +135,17 @@ class CallActivity : AppCompatActivity() {
     }
     
     private fun startCall() {
+        Log.d("CallActivity", "🚀 Starting call...")
+        Log.d("CallActivity", "   Server URL: $serverUrl")
+        Log.d("CallActivity", "   Call ID: $callId")
         lifecycleScope.launch {
-            callRepository.startCall(serverUrl, callId)
+            try {
+                callRepository.startCall(serverUrl, callId)
+                Log.d("CallActivity", "✅ Call started successfully")
+            } catch (e: Exception) {
+                Log.e("CallActivity", "❌ Failed to start call: ${e.message}", e)
+                Toast.makeText(this@CallActivity, "Failed to start call: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
     
@@ -160,6 +181,7 @@ class CallActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("CallActivity", "CallActivity destroyed - ending call")
         callRepository.endCall()
     }
 }

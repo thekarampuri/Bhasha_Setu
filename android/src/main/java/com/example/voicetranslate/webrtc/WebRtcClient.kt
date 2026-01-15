@@ -202,12 +202,18 @@ class WebRtcClient(
         }, sdpConstraints)
     }
     
+    // Queue for ICE candidates received before remote description
+    private val iceCandidateQueue = mutableListOf<IceCandidate>()
+    private var isRemoteDescriptionSet = false
+
     fun setRemoteDescription(sdp: SessionDescription) {
         Log.d(tag, "Setting remote description (${sdp.type})...")
         
         peerConnection?.setRemoteDescription(object : SdpObserver {
             override fun onSetSuccess() {
                 Log.d(tag, "✅ Remote description set (${sdp.type})")
+                isRemoteDescriptionSet = true
+                drainIceCandidateQueue()
             }
             
             override fun onSetFailure(error: String?) {
@@ -221,12 +227,32 @@ class WebRtcClient(
     }
     
     fun addIceCandidate(candidate: IceCandidate) {
-        Log.d(tag, "Adding ICE candidate: ${candidate.sdpMid}")
-        val success = peerConnection?.addIceCandidate(candidate) ?: false
-        if (success) {
-            Log.d(tag, "✅ ICE candidate added")
+        if (isRemoteDescriptionSet) {
+            Log.d(tag, "Adding ICE candidate: ${candidate.sdpMid}")
+            val success = peerConnection?.addIceCandidate(candidate) ?: false
+            if (success) {
+                Log.d(tag, "✅ ICE candidate added")
+            } else {
+                Log.w(tag, "⚠️ Failed to add ICE candidate")
+            }
         } else {
-            Log.w(tag, "⚠️ Failed to add ICE candidate")
+            Log.d(tag, "⏳ Queueing ICE candidate (remote description not set)")
+            iceCandidateQueue.add(candidate)
+        }
+    }
+
+    private fun drainIceCandidateQueue() {
+        if (iceCandidateQueue.isNotEmpty()) {
+            Log.d(tag, "Processing ${iceCandidateQueue.size} queued ICE candidates...")
+            iceCandidateQueue.forEach { candidate ->
+                val success = peerConnection?.addIceCandidate(candidate) ?: false
+                if (success) {
+                    Log.d(tag, "✅ Queued ICE candidate added")
+                } else {
+                    Log.w(tag, "⚠️ Failed to add queued ICE candidate")
+                }
+            }
+            iceCandidateQueue.clear()
         }
     }
     

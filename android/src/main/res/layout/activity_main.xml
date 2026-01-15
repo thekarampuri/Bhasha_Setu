@@ -110,7 +110,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Server URL (IP:Port)"
-                    android:text="192.168.1.10:8001"
+                    android:text="192.168.31.29:8001"
                     android:textColor="#FFFFFF"
                     android:textColorHint="#80FFFFFF"
                     android:textSize="14sp"

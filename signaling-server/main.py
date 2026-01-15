@@ -1,20 +1,23 @@
 """
-WebRTC Signaling Server - Minimal Implementation
+WebRTC Signaling Server - Production Ready
 
-Responsibilities:
-- Relay SDP offers/answers between peers
-- Relay ICE candidates between peers
-- Manage 1-to-1 call rooms (max 2 users)
-- Auto cleanup on disconnect
-
-No media handling - only signaling.
+Improvements:
+1. ✅ WebSocket keepalive (ping/pong)
+2. ✅ Better error handling
+3. ✅ Connection state tracking
+4. ✅ Graceful shutdown
+5. ✅ Enhanced logging
+6. ✅ ICE candidate relay verification
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import json
 import uvicorn
 from typing import Dict, Optional
+import asyncio
+from datetime import datetime
 
 app = FastAPI(title="Bhasha Setu Signaling Server")
 
@@ -27,8 +30,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve static files (web client)
+try:
+    app.mount("/client", StaticFiles(directory="web-client", html=True), name="client")
+except RuntimeError:
+    print("⚠️  web-client directory not found, static files not served")
+
 # Room storage: {call_id: {user_id: WebSocket}}
 rooms: Dict[str, Dict[str, WebSocket]] = {}
+
+# Connection metadata
+connection_metadata: Dict[str, Dict] = {}
+
+
+def log(msg: str):
+    """Enhanced logging with timestamp"""
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    print(f"[{timestamp}] {msg}")
 
 
 @app.get("/")
@@ -37,8 +55,21 @@ async def health_check():
     return {
         "status": "running",
         "service": "WebRTC Signaling Server",
-        "active_rooms": len(rooms)
+        "active_rooms": len(rooms),
+        "total_connections": sum(len(users) for users in rooms.values())
     }
+
+
+@app.get("/rooms")
+async def list_rooms():
+    """List all active rooms (for debugging)"""
+    room_info = {}
+    for call_id, users in rooms.items():
+        room_info[call_id] = {
+            "user_count": len(users),
+            "users": [uid[:8] + "..." for uid in users.keys()]
+        }
+    return room_info
 
 
 @app.websocket("/ws/{call_id}/{user_id}")
@@ -51,12 +82,6 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
     - user_id: Unique user identifier (UUID)
     """
     
-    from datetime import datetime
-    
-    def log(msg: str):
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        print(f"[{timestamp}] {msg}")
-    
     # Check room capacity (max 2 users)
     if call_id in rooms and len(rooms[call_id]) >= 2:
         await websocket.close(code=1008, reason="Room full")
@@ -64,17 +89,30 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
         return
     
     # Accept connection
-    await websocket.accept()
+    try:
+        await websocket.accept()
+        log(f"✅ WebSocket accepted for {user_id[:8]}")
+    except Exception as e:
+        log(f"❌ Failed to accept WebSocket: {e}")
+        return
     
     # Create room if doesn't exist
     if call_id not in rooms:
         rooms[call_id] = {}
+        log(f"🆕 Created room: {call_id}")
     
     # Determine if this user is the initiator (first to join)
     is_initiator = len(rooms[call_id]) == 0
     
     # Add user to room
     rooms[call_id][user_id] = websocket
+    connection_metadata[user_id] = {
+        "call_id": call_id,
+        "joined_at": datetime.now(),
+        "is_initiator": is_initiator,
+        "last_ping": datetime.now()
+    }
+    
     log(f"✅ User {user_id[:8]} joined room {call_id} ({len(rooms[call_id])}/2) - {'INITIATOR' if is_initiator else 'CALLEE'}")
     
     # Notify peer if they exist
@@ -87,27 +125,75 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
         })
         log(f"📢 Notified {peer_id[:8]} that {user_id[:8]} joined")
     
+    # Start keepalive task
+    keepalive_task = asyncio.create_task(keepalive(websocket, user_id))
+    
     try:
         # Message relay loop
         while True:
             # Receive message from client
             data = await websocket.receive_text()
-            message = json.loads(data)
             
-            msg_type = message.get("type")
-            log(f"📨 [{user_id[:8]}] → {msg_type}")
+            # Update last activity
+            if user_id in connection_metadata:
+                connection_metadata[user_id]["last_ping"] = datetime.now()
             
-            # Relay message to peer
-            if msg_type in ["offer", "answer", "ice-candidate"]:
-                await send_to_peer(call_id, user_id, message)
-            
+            try:
+                message = json.loads(data)
+                msg_type = message.get("type")
+                
+                log(f"📨 [{user_id[:8]}] → {msg_type}")
+                
+                # Validate message
+                if not msg_type:
+                    log(f"⚠️  Invalid message from {user_id[:8]}: no type field")
+                    continue
+                
+                # Relay message to peer
+                if msg_type in ["offer", "answer", "ice-candidate"]:
+                    # Additional validation for ICE candidates
+                    if msg_type == "ice-candidate":
+                        if "candidate" not in message:
+                            log(f"⚠️  Invalid ICE candidate from {user_id[:8]}: missing candidate field")
+                            continue
+                        log(f"🧊 Relaying ICE candidate from {user_id[:8]}")
+                    
+                    success = await send_to_peer(call_id, user_id, message)
+                    if not success:
+                        log(f"⚠️  Failed to relay {msg_type} from {user_id[:8]} (peer not found)")
+                else:
+                    log(f"⚠️  Unknown message type from {user_id[:8]}: {msg_type}")
+                    
+            except json.JSONDecodeError as e:
+                log(f"⚠️  Invalid JSON from {user_id[:8]}: {e}")
+            except Exception as e:
+                log(f"⚠️  Error processing message from {user_id[:8]}: {e}")
+    
     except WebSocketDisconnect:
         log(f"❌ User {user_id[:8]} disconnected from room {call_id}")
     except Exception as e:
-        log(f"⚠️ Error for {user_id[:8]}: {e}")
+        log(f"⚠️  Error for {user_id[:8]}: {e}")
     finally:
+        # Cancel keepalive task
+        keepalive_task.cancel()
+        
         # Cleanup on disconnect
-        cleanup_user(call_id, user_id)
+        await cleanup_user(call_id, user_id)
+
+
+async def keepalive(websocket: WebSocket, user_id: str):
+    """Send periodic ping to keep connection alive"""
+    try:
+        while True:
+            await asyncio.sleep(20)  # Ping every 20 seconds
+            try:
+                await websocket.send_text(json.dumps({"type": "ping"}))
+                log(f"🏓 Ping sent to {user_id[:8]}")
+            except Exception as e:
+                log(f"⚠️  Failed to ping {user_id[:8]}: {e}")
+                break
+    except asyncio.CancelledError:
+        log(f"Keepalive cancelled for {user_id[:8]}")
 
 
 def get_peer_id(call_id: str, user_id: str) -> Optional[str]:
@@ -122,7 +208,7 @@ def get_peer_id(call_id: str, user_id: str) -> Optional[str]:
     return None
 
 
-async def send_to_peer(call_id: str, sender_id: str, message: dict):
+async def send_to_peer(call_id: str, sender_id: str, message: dict) -> bool:
     """Send message to the peer (not the sender)"""
     peer_id = get_peer_id(call_id, sender_id)
     
@@ -130,51 +216,59 @@ async def send_to_peer(call_id: str, sender_id: str, message: dict):
         peer_ws = rooms[call_id][peer_id]
         try:
             await peer_ws.send_text(json.dumps(message))
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            print(f"[{timestamp}] 📤 Relayed {message.get('type')} from {sender_id[:8]} to {peer_id[:8]}")
+            log(f"📤 Relayed {message.get('type')} from {sender_id[:8]} to {peer_id[:8]}")
+            return True
         except Exception as e:
-            print(f"⚠️ Failed to send to {peer_id[:8]}: {e}")
+            log(f"⚠️  Failed to send to {peer_id[:8]}: {e}")
+            return False
+    else:
+        log(f"⚠️  Peer not found for {sender_id[:8]} in room {call_id}")
+        return False
 
 
-def cleanup_user(call_id: str, user_id: str):
+async def cleanup_user(call_id: str, user_id: str):
     """Remove user from room and notify peer"""
     if call_id in rooms:
         # Remove user
         if user_id in rooms[call_id]:
             del rooms[call_id][user_id]
-            print(f"🗑️ Removed {user_id} from room {call_id}")
+            log(f"🗑️  Removed {user_id[:8]} from room {call_id}")
+        
+        # Remove metadata
+        if user_id in connection_metadata:
+            del connection_metadata[user_id]
         
         # Notify peer
         peer_id = get_peer_id(call_id, user_id)
         if peer_id:
             try:
                 peer_ws = rooms[call_id][peer_id]
-                # Use asyncio to send in sync context
-                import asyncio
-                asyncio.create_task(peer_ws.send_text(json.dumps({
+                await peer_ws.send_text(json.dumps({
                     "type": "peer-left",
                     "callId": call_id,
                     "peerId": user_id
-                })))
-                print(f"📢 Notified {peer_id} that {user_id} left")
+                }))
+                log(f"📢 Notified {peer_id[:8]} that {user_id[:8]} left")
             except Exception as e:
-                print(f"⚠️ Failed to notify peer: {e}")
+                log(f"⚠️  Failed to notify peer: {e}")
         
         # Delete room if empty
         if not rooms[call_id]:
             del rooms[call_id]
-            print(f"🗑️ Deleted empty room {call_id}")
+            log(f"🗑️  Deleted empty room {call_id}")
 
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("WebRTC Signaling Server")
+    print("WebRTC Signaling Server - Production Ready")
     print("=" * 60)
-    print("Mode: SDP/ICE relay only (no media)")
+    print("Mode: SDP/ICE relay with keepalive")
     print("Rooms: 1-to-1 (max 2 users)")
     print("Host: 0.0.0.0")
     print("Port: 8001")
     print("=" * 60)
+    print("Web Client: http://localhost:8001/client")
+    print("Health Check: http://localhost:8001/")
+    print("Rooms List: http://localhost:8001/rooms")
+    print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=8001)
-
