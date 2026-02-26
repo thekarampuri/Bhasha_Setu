@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.example.voicetranslate.app-debug-37:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.example.voicetranslate.app-main-39:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-37:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.example.voicetranslate.app-main-39:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-37:/xml_backup_rules.xml.flat",
+        "source": "com.example.voicetranslate.app-main-39:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-37:/xml_data_extraction_rules.xml.flat",
+        "source": "com.example.voicetranslate.app-main-39:/xml/data_extraction_rules.xml"
+    }
+]

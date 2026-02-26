@@ -1,3 +1,0 @@
-com.example.voicetranslate.test
-style WhiteBackgroundDialogTheme
-style WhiteBackgroundTheme

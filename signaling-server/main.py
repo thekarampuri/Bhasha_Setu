@@ -118,12 +118,21 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
     # Notify peer if they exist
     peer_id = get_peer_id(call_id, user_id)
     if peer_id:
+        # Notify the existing peer that we joined
         await send_to_peer(call_id, user_id, {
             "type": "peer-joined",
             "callId": call_id,
             "peerId": user_id
         })
-        log(f"📢 Notified {peer_id[:8]} that {user_id[:8]} joined")
+        log(f"📢 Notified existing peer {peer_id[:8]} that {user_id[:8]} joined")
+        
+        # ALSO notify the joining user (us) that a peer is already there
+        await websocket.send_text(json.dumps({
+            "type": "peer-joined",
+            "callId": call_id,
+            "peerId": peer_id
+        }))
+        log(f"📢 Notified joining user {user_id[:8]} that {peer_id[:8]} is already here")
     
     # Start keepalive task
     keepalive_task = asyncio.create_task(keepalive(websocket, user_id))
