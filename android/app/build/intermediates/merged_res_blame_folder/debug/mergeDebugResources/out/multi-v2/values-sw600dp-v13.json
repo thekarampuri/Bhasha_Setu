@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.voicetranslate.app-mergeDebugResources-35:/values-sw600dp-v13/values-sw600dp-v13.xml",
+            "outputFile": "com.example.voicetranslate.app-mergeDebugResources-54:/values-sw600dp-v13/values-sw600dp-v13.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\af97c9eca986484ab8eb1392c88d9743\\transformed\\material-1.11.0\\res\\values-sw600dp-v13\\values-sw600dp-v13.xml",
+                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\03c7fcc07372582fe4ba38f04c1473ed\\transformed\\material-1.11.0\\res\\values-sw600dp-v13\\values-sw600dp-v13.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,10,11,12,13,14",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4",
@@ -23,7 +23,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\87282954fd62f6edf1ba490b4466f498\\transformed\\appcompat-1.6.1\\res\\values-sw600dp-v13\\values-sw600dp-v13.xml",
+                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\80d72229bf4756d34213481dd71f6213\\transformed\\appcompat-1.6.1\\res\\values-sw600dp-v13\\values-sw600dp-v13.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

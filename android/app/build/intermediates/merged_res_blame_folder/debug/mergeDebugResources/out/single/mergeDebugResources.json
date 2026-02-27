@@ -1,18 +1,38 @@
 [
     {
-        "merged": "com.example.voicetranslate.app-debug-37:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.example.voicetranslate.app-main-39:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "com.example.voicetranslate.app-debug-56:/drawable_gradient_background.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/drawable/gradient_background.xml"
     },
     {
-        "merged": "com.example.voicetranslate.app-debug-37:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "com.example.voicetranslate.app-main-39:/mipmap-anydpi-v26/ic_launcher_round.xml"
+        "merged": "com.example.voicetranslate.app-debug-56:/xml_backup_rules.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/xml/backup_rules.xml"
     },
     {
-        "merged": "com.example.voicetranslate.app-debug-37:/xml_backup_rules.xml.flat",
-        "source": "com.example.voicetranslate.app-main-39:/xml/backup_rules.xml"
+        "merged": "com.example.voicetranslate.app-debug-56:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/drawable/ic_launcher_foreground.xml"
     },
     {
-        "merged": "com.example.voicetranslate.app-debug-37:/xml_data_extraction_rules.xml.flat",
-        "source": "com.example.voicetranslate.app-main-39:/xml/data_extraction_rules.xml"
+        "merged": "com.example.voicetranslate.app-debug-56:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-56:/layout_activity_call.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/layout/activity_call.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-56:/layout_activity_main.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-56:/drawable_gradient_button.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/drawable/gradient_button.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-56:/xml_data_extraction_rules.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.example.voicetranslate.app-debug-56:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.example.voicetranslate.app-main-58:/mipmap-anydpi-v26/ic_launcher_round.xml"
     }
 ]

@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.voicetranslate.app-mergeDebugResources-35:/values-xlarge-v4/values-xlarge-v4.xml",
+            "outputFile": "com.example.voicetranslate.app-mergeDebugResources-54:/values-xlarge-v4/values-xlarge-v4.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\87282954fd62f6edf1ba490b4466f498\\transformed\\appcompat-1.6.1\\res\\values-xlarge-v4\\values-xlarge-v4.xml",
+                    "source": "C:\\Users\\Admin\\.gradle\\caches\\9.0-milestone-1\\transforms\\80d72229bf4756d34213481dd71f6213\\transformed\\appcompat-1.6.1\\res\\values-xlarge-v4\\values-xlarge-v4.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7",
                         "startColumns": "4,4,4,4,4,4",
