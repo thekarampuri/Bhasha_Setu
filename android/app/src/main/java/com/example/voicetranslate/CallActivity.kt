@@ -159,20 +159,24 @@ class CallActivity : AppCompatActivity() {
             CallState.ENDED -> "Call Ended"
         }
         
-        binding.tvDuration.text = statusText
-        
-        // Enable mute button when connected
-        binding.fabMute.isEnabled = (state == CallState.CONNECTED)
-        
-        // End call if state is ENDED
-        if (state == CallState.ENDED) {
-            finish()
+        runOnUiThread {
+            binding.tvDuration.text = statusText
+            
+            // Enable mute button when connected
+            binding.fabMute.isEnabled = (state == CallState.CONNECTED)
+            
+            // End call if state is ENDED
+            if (state == CallState.ENDED) {
+                finish()
+            }
         }
     }
     
     private fun updateMuteButton(muted: Boolean) {
-        // Update button appearance based on mute state
-        binding.fabMute.alpha = if (muted) 1.0f else 0.5f
+        runOnUiThread {
+            // Update button appearance based on mute state
+            binding.fabMute.alpha = if (muted) 1.0f else 0.5f
+        }
     }
     
     private fun endCall() {

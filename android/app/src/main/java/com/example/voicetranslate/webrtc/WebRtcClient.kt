@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import org.webrtc.*
 import org.webrtc.audio.JavaAudioDeviceModule
+import android.os.Handler
+import android.os.Looper
 
 /**
  * WebRTC Client for audio-only calls
@@ -125,39 +127,48 @@ class WebRtcClient(
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         }
         
-        peerConnection?.createOffer(object : SdpObserver {
-            override fun onCreateSuccess(sdp: SessionDescription?) {
-                if (sdp == null) {
-                    Log.e(tag, "❌ Created SDP is null")
-                    listener.onError("Failed to create offer: SDP is null")
-                    return
+        Handler(Looper.getMainLooper()).post {
+            peerConnection?.createOffer(object : SdpObserver {
+                override fun onCreateSuccess(sdp: SessionDescription?) {
+                    if (sdp == null) {
+                        Log.e(tag, "❌ Created SDP is null")
+                        listener.onError("Failed to create offer: SDP is null")
+                        return
+                    }
+                    
+                    Log.d(tag, "✅ Offer created successfully")
+                    // Execute setLocalDescription on main thread to avoid crash
+                    Handler(Looper.getMainLooper()).post {
+                        peerConnection?.setLocalDescription(object : SdpObserver {
+                            override fun onSetSuccess() {
+                                Handler(Looper.getMainLooper()).post {
+                                    Log.d(tag, "✅ Local description set (offer)")
+                                    isLocalDescriptionSet = true
+                                    listener.onLocalSdpCreated(sdp)
+                                    drainLocalIceCandidateQueue()
+                                }
+                            }
+                            
+                            override fun onSetFailure(error: String?) {
+                                Log.e(tag, "❌ Failed to set local description: $error")
+                                listener.onError("Failed to set local description: $error")
+                            }
+                            
+                            override fun onCreateSuccess(p0: SessionDescription?) {}
+                            override fun onCreateFailure(p0: String?) {}
+                        }, sdp)
+                    }
                 }
                 
-                Log.d(tag, "✅ Offer created successfully")
-                peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onSetSuccess() {
-                        Log.d(tag, "✅ Local description set (offer)")
-                        listener.onLocalSdpCreated(sdp)
-                    }
-                    
-                    override fun onSetFailure(error: String?) {
-                        Log.e(tag, "❌ Failed to set local description: $error")
-                        listener.onError("Failed to set local description: $error")
-                    }
-                    
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onCreateFailure(p0: String?) {}
-                }, sdp)
-            }
-            
-            override fun onCreateFailure(error: String?) {
-                Log.e(tag, "❌ Failed to create offer: $error")
-                listener.onError("Failed to create offer: $error")
-            }
-            
-            override fun onSetSuccess() {}
-            override fun onSetFailure(p0: String?) {}
-        }, sdpConstraints)
+                override fun onCreateFailure(error: String?) {
+                    Log.e(tag, "❌ Failed to create offer: $error")
+                    listener.onError("Failed to create offer: $error")
+                }
+                
+                override fun onSetSuccess() {}
+                override fun onSetFailure(p0: String?) {}
+            }, sdpConstraints)
+        }
     }
     
     fun createAnswer() {
@@ -167,93 +178,127 @@ class WebRtcClient(
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         }
         
-        peerConnection?.createAnswer(object : SdpObserver {
-            override fun onCreateSuccess(sdp: SessionDescription?) {
-                if (sdp == null) {
-                    Log.e(tag, "❌ Created SDP is null")
-                    listener.onError("Failed to create answer: SDP is null")
-                    return
+        Handler(Looper.getMainLooper()).post {
+            peerConnection?.createAnswer(object : SdpObserver {
+                override fun onCreateSuccess(sdp: SessionDescription?) {
+                    if (sdp == null) {
+                        Log.e(tag, "❌ Created SDP is null")
+                        listener.onError("Failed to create answer: SDP is null")
+                        return
+                    }
+                    
+                    Log.d(tag, "✅ Answer created successfully")
+                    // Execute setLocalDescription on main thread to avoid crash
+                    Handler(Looper.getMainLooper()).post {
+                        peerConnection?.setLocalDescription(object : SdpObserver {
+                            override fun onSetSuccess() {
+                                Handler(Looper.getMainLooper()).post {
+                                    Log.d(tag, "✅ Local description set (answer)")
+                                    isLocalDescriptionSet = true
+                                    listener.onLocalSdpCreated(sdp)
+                                    drainLocalIceCandidateQueue()
+                                }
+                            }
+                            
+                            override fun onSetFailure(error: String?) {
+                                Log.e(tag, "❌ Failed to set local description: $error")
+                                listener.onError("Failed to set local description: $error")
+                            }
+                            
+                            override fun onCreateSuccess(p0: SessionDescription?) {}
+                            override fun onCreateFailure(p0: String?) {}
+                        }, sdp)
+                    }
                 }
                 
-                Log.d(tag, "✅ Answer created successfully")
-                peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onSetSuccess() {
-                        Log.d(tag, "✅ Local description set (answer)")
-                        listener.onLocalSdpCreated(sdp)
-                    }
-                    
-                    override fun onSetFailure(error: String?) {
-                        Log.e(tag, "❌ Failed to set local description: $error")
-                        listener.onError("Failed to set local description: $error")
-                    }
-                    
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onCreateFailure(p0: String?) {}
-                }, sdp)
-            }
-            
-            override fun onCreateFailure(error: String?) {
-                Log.e(tag, "❌ Failed to create answer: $error")
-                listener.onError("Failed to create answer: $error")
-            }
-            
-            override fun onSetSuccess() {}
-            override fun onSetFailure(p0: String?) {}
-        }, sdpConstraints)
+                override fun onCreateFailure(error: String?) {
+                    Log.e(tag, "❌ Failed to create answer: $error")
+                    listener.onError("Failed to create answer: $error")
+                }
+                
+                override fun onSetSuccess() {}
+                override fun onSetFailure(p0: String?) {}
+            }, sdpConstraints)
+        }
     }
     
     // Queue for ICE candidates received before remote description
     private val iceCandidateQueue = mutableListOf<IceCandidate>()
     private var isRemoteDescriptionSet = false
 
+    // Queue for local ICE candidates generated before local description is set
+    private val localIceCandidateQueue = mutableListOf<IceCandidate>()
+    private var isLocalDescriptionSet = false
+    
+    private fun drainLocalIceCandidateQueue() {
+        if (localIceCandidateQueue.isNotEmpty()) {
+            Log.d(tag, "Processing ${localIceCandidateQueue.size} queued local ICE candidates...")
+            localIceCandidateQueue.forEach { candidate ->
+                listener.onIceCandidateGenerated(candidate)
+            }
+            localIceCandidateQueue.clear()
+        }
+    }
+
     fun setRemoteDescription(sdp: SessionDescription, onComplete: () -> Unit = {}) {
         Log.d(tag, "Setting remote description (${sdp.type})...")
         
-        peerConnection?.setRemoteDescription(object : SdpObserver {
-            override fun onSetSuccess() {
-                Log.d(tag, "✅ Remote description set (${sdp.type})")
-                isRemoteDescriptionSet = true
-                drainIceCandidateQueue()
-                onComplete()
-            }
-            
-            override fun onSetFailure(error: String?) {
-                Log.e(tag, "❌ Failed to set remote description: $error")
-                listener.onError("Failed to set remote description: $error")
-            }
-            
-            override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onCreateFailure(p0: String?) {}
-        }, sdp)
+        // Execute on main thread to avoid crash
+        Handler(Looper.getMainLooper()).post {
+            peerConnection?.setRemoteDescription(object : SdpObserver {
+                override fun onSetSuccess() {
+                    Handler(Looper.getMainLooper()).post {
+                        Log.d(tag, "✅ Remote description set (${sdp.type})")
+                        isRemoteDescriptionSet = true
+                        drainIceCandidateQueue()
+                        onComplete()
+                    }
+                }
+                
+                override fun onSetFailure(error: String?) {
+                    Log.e(tag, "❌ Failed to set remote description: $error")
+                    listener.onError("Failed to set remote description: $error")
+                }
+                
+                override fun onCreateSuccess(p0: SessionDescription?) {}
+                override fun onCreateFailure(p0: String?) {}
+            }, sdp)
+        }
     }
     
     fun addIceCandidate(candidate: IceCandidate) {
-        if (isRemoteDescriptionSet) {
-            Log.d(tag, "Adding ICE candidate: ${candidate.sdpMid}")
-            val success = peerConnection?.addIceCandidate(candidate) ?: false
-            if (success) {
-                Log.d(tag, "✅ ICE candidate added")
+        // Must run on main thread to avoid WebRTC crashes
+        Handler(Looper.getMainLooper()).post {
+            if (isRemoteDescriptionSet) {
+                Log.d(tag, "Adding ICE candidate: ${candidate.sdpMid}")
+                val success = peerConnection?.addIceCandidate(candidate) ?: false
+                if (success) {
+                    Log.d(tag, "✅ ICE candidate added")
+                } else {
+                    Log.w(tag, "⚠️ Failed to add ICE candidate")
+                }
             } else {
-                Log.w(tag, "⚠️ Failed to add ICE candidate")
+                Log.d(tag, "⏳ Queueing ICE candidate (remote description not set)")
+                iceCandidateQueue.add(candidate)
             }
-        } else {
-            Log.d(tag, "⏳ Queueing ICE candidate (remote description not set)")
-            iceCandidateQueue.add(candidate)
         }
     }
 
     private fun drainIceCandidateQueue() {
-        if (iceCandidateQueue.isNotEmpty()) {
-            Log.d(tag, "Processing ${iceCandidateQueue.size} queued ICE candidates...")
-            iceCandidateQueue.forEach { candidate ->
-                val success = peerConnection?.addIceCandidate(candidate) ?: false
-                if (success) {
-                    Log.d(tag, "✅ Queued ICE candidate added")
-                } else {
-                    Log.w(tag, "⚠️ Failed to add queued ICE candidate")
+        // Must run on main thread to avoid WebRTC crashes
+        Handler(Looper.getMainLooper()).post {
+            if (iceCandidateQueue.isNotEmpty()) {
+                Log.d(tag, "Processing ${iceCandidateQueue.size} queued ICE candidates...")
+                iceCandidateQueue.forEach { candidate ->
+                    val success = peerConnection?.addIceCandidate(candidate) ?: false
+                    if (success) {
+                        Log.d(tag, "✅ Queued ICE candidate added")
+                    } else {
+                        Log.w(tag, "⚠️ Failed to add queued ICE candidate")
+                    }
                 }
+                iceCandidateQueue.clear()
             }
-            iceCandidateQueue.clear()
         }
     }
     
@@ -269,8 +314,16 @@ class WebRtcClient(
     private val peerConnectionObserver = object : PeerConnection.Observer {
         override fun onIceCandidate(candidate: IceCandidate?) {
             if (candidate != null) {
-                Log.d(tag, "🧊 ICE candidate generated: ${candidate.sdpMid}")
-                listener.onIceCandidateGenerated(candidate)
+                // Execute on main thread to avoid ConcurrentModificationException with localIceCandidateQueue
+                Handler(Looper.getMainLooper()).post {
+                    if (isLocalDescriptionSet) {
+                        Log.d(tag, "🧊 ICE candidate generated: ${candidate.sdpMid}")
+                        listener.onIceCandidateGenerated(candidate)
+                    } else {
+                        Log.d(tag, "⏳ Queueing local ICE candidate (local description not set)")
+                        localIceCandidateQueue.add(candidate)
+                    }
+                }
             }
         }
         

@@ -57,6 +57,7 @@ class SignalingClient(
     interface SignalingListener {
         fun onConnected()
         fun onPeerJoined(peerId: String?)
+        fun onExistingPeer(peerId: String?)
         fun onOfferReceived(sdp: String)
         fun onAnswerReceived(sdp: String)
         fun onIceCandidateReceived(candidate: IceCandidate)
@@ -192,6 +193,12 @@ class SignalingClient(
                     val peerId = json.get("peerId")?.asString
                     Log.d(tag, "👤 Peer joined: $peerId")
                     listener.onPeerJoined(peerId)
+                }
+                
+                "existing-peer" -> {
+                    val peerId = json.get("peerId")?.asString
+                    Log.d(tag, "👤 Existing peer: $peerId")
+                    listener.onExistingPeer(peerId)
                 }
                 
                 "offer" -> {

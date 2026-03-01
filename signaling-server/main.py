@@ -128,7 +128,7 @@ async def websocket_endpoint(websocket: WebSocket, call_id: str, user_id: str):
         
         # ALSO notify the joining user (us) that a peer is already there
         await websocket.send_text(json.dumps({
-            "type": "peer-joined",
+            "type": "existing-peer",
             "callId": call_id,
             "peerId": peer_id
         }))
@@ -266,6 +266,7 @@ async def cleanup_user(call_id: str, user_id: str):
             del rooms[call_id]
             log(f"🗑️  Deleted empty room {call_id}")
 
+import os
 
 if __name__ == "__main__":
     print("=" * 60)
@@ -274,10 +275,11 @@ if __name__ == "__main__":
     print("Mode: SDP/ICE relay with keepalive")
     print("Rooms: 1-to-1 (max 2 users)")
     print("Host: 0.0.0.0")
-    print("Port: 8001")
+    port = int(os.environ.get("PORT", 8001))
+    print(f"Port: {port}")
     print("=" * 60)
-    print("Web Client: http://localhost:8001/client")
-    print("Health Check: http://localhost:8001/")
-    print("Rooms List: http://localhost:8001/rooms")
+    print(f"Web Client: http://localhost:{port}/client")
+    print(f"Health Check: http://localhost:{port}/")
+    print(f"Rooms List: http://localhost:{port}/rooms")
     print("=" * 60)
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=port)

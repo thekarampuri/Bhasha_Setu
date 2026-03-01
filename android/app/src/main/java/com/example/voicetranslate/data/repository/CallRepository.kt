@@ -113,24 +113,22 @@ class CallRepository(
         override fun onPeerJoined(peerId: String?) {
             Log.d(tag, "👤 Peer joined: $peerId")
             
-            // Determine who is the initiator based on the current state
-            // If we were already CALLING, it means we joined first and peer just joined
-            // So we are the initiator
-            if (_callState.value == CallState.CALLING) {
-                isInitiator = true
-                Log.d(tag, "📞 We're the INITIATOR (joined first) - creating offer")
-                _callState.value = CallState.CONNECTING
-                // Small delay to ensure peer is ready
-                scope.launch {
-                    delay(500)
-                    webRtcClient?.createOffer()
-                }
-            } else {
-                // We joined second, peer was already there
-                isInitiator = false
-                Log.d(tag, "📞 We're the CALLEE (joined second) - waiting for offer")
-                _callState.value = CallState.RINGING
+            isInitiator = true
+            Log.d(tag, "📞 We're the INITIATOR (joined first) - creating offer")
+            _callState.value = CallState.CONNECTING
+            // Small delay to ensure peer is ready
+            scope.launch {
+                delay(500)
+                webRtcClient?.createOffer()
             }
+        }
+        
+        override fun onExistingPeer(peerId: String?) {
+            Log.d(tag, "👤 Existing peer: $peerId")
+            
+            isInitiator = false
+            Log.d(tag, "📞 We're the CALLEE (joined second) - waiting for offer")
+            _callState.value = CallState.RINGING
         }
         
         override fun onOfferReceived(sdp: String) {
@@ -213,10 +211,11 @@ class CallRepository(
         override fun onIceCandidateGenerated(candidate: IceCandidate) {
             Log.d(tag, "📤 ICE candidate generated")
             
-            // Send ICE candidate to peer via signaling
+            // Send ICE candidate to peer via signaling.
+            // WebRTC Java API may return null for sdpMid, which throws NPE in Kotlin. Use safe calls.
             val iceCandidate = com.example.voicetranslate.data.model.IceCandidate(
-                candidate = candidate.sdp,
-                sdpMid = candidate.sdpMid,
+                candidate = candidate.sdp ?: "",
+                sdpMid = candidate.sdpMid ?: "",
                 sdpMLineIndex = candidate.sdpMLineIndex
             )
             signalingClient?.sendIceCandidate(currentCallId, iceCandidate)
@@ -232,8 +231,8 @@ class CallRepository(
                     cancelConnectionTimeout()
                 }
                 PeerConnection.IceConnectionState.DISCONNECTED -> {
-                    Log.d(tag, "❌ Call disconnected")
-                    endCall()
+                    Log.d(tag, "⚠️ Call DISCONNECTED (WebRTC gathering or network hop) - waiting to see if it recovers")
+                    // Do NOT call endCall() here as WebRTC often transitions through DISCONNECTED during ICE gathering or handover
                 }
                 PeerConnection.IceConnectionState.FAILED -> {
                     Log.e(tag, "❌ Connection failed")

@@ -30,8 +30,9 @@ class WebRTCClient {
         this.isConnected = false;
         this.isMuted = false;
 
-        // ICE candidate queue (for candidates received before remote description)
+        // ICE candidate queues
         this.iceCandidateQueue = [];
+        this.localIceCandidateQueue = [];
 
         // Configuration
         this.config = {
@@ -146,16 +147,22 @@ class WebRTCClient {
             if (event.candidate) {
                 this.log(`🧊 ICE candidate generated: ${event.candidate.type}`, 'info');
 
-                // Send ICE candidate to peer via signaling
-                this.sendSignalingMessage({
-                    type: 'ice-candidate',
-                    callId: this.callId,
-                    candidate: {
-                        candidate: event.candidate.candidate,
-                        sdpMid: event.candidate.sdpMid,
-                        sdpMLineIndex: event.candidate.sdpMLineIndex
-                    }
-                });
+                const candidateData = {
+                    candidate: event.candidate.candidate,
+                    sdpMid: event.candidate.sdpMid,
+                    sdpMLineIndex: event.candidate.sdpMLineIndex
+                };
+
+                if (this.peerConnection.localDescription) {
+                    // Send ICE candidate to peer via signaling
+                    this.sendSignalingMessage({
+                        type: 'ice-candidate',
+                        callId: this.callId,
+                        candidate: candidateData
+                    });
+                } else {
+                    this.localIceCandidateQueue.push(candidateData);
+                }
             } else {
                 this.log('ICE candidate gathering complete', 'info');
             }
@@ -287,6 +294,9 @@ class WebRTCClient {
             case 'peer-joined':
                 await this.handlePeerJoined(message);
                 break;
+            case 'existing-peer':
+                this.handleExistingPeer(message);
+                break;
             case 'offer':
                 await this.handleOffer(message);
                 break;
@@ -332,6 +342,16 @@ class WebRTCClient {
 
             this.log('✅ Local description set (offer)', 'success');
             this.log(`SDP offer created (${offer.sdp.length} bytes)`, 'info');
+
+            // Process any queued local ICE candidates
+            this.localIceCandidateQueue.forEach(candidate => {
+                this.sendSignalingMessage({
+                    type: 'ice-candidate',
+                    callId: this.callId,
+                    candidate: candidate
+                });
+            });
+            this.localIceCandidateQueue = [];
 
             // Send offer to peer
             this.sendSignalingMessage({
@@ -388,6 +408,16 @@ class WebRTCClient {
 
             this.log('✅ Local description set (answer)', 'success');
             this.log(`SDP answer created (${answer.sdp.length} bytes)`, 'info');
+
+            // Process any queued local ICE candidates
+            this.localIceCandidateQueue.forEach(candidate => {
+                this.sendSignalingMessage({
+                    type: 'ice-candidate',
+                    callId: this.callId,
+                    candidate: candidate
+                });
+            });
+            this.localIceCandidateQueue = [];
 
             // Send answer to peer
             this.sendSignalingMessage({
@@ -468,6 +498,13 @@ class WebRTCClient {
         this.log(`👋 Peer left: ${message.peerId}`, 'warning');
         this.updateStatus('Peer disconnected', 'error');
         this.endCall();
+    }
+
+    handleExistingPeer(message) {
+        this.log(`👤 Existing peer in room: ${message.peerId}`, 'success');
+        this.isInitiator = false;
+        this.log('We are the CALLEE - waiting for offer', 'info');
+        this.updateStatus('Waiting for offer...', 'connecting');
     }
 
     sendSignalingMessage(message) {
